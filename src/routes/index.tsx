@@ -493,9 +493,9 @@ function PlayScreen({
   const streak = players[activePlayer].streak;
 
   return (
-    <section className="flex flex-1 flex-col">
+    <section className="flex h-full min-h-0 flex-1 flex-col">
       {/* الشريط العلوي */}
-      <header className="mb-4 flex items-center justify-between gap-2 text-xs">
+      <header className="mb-3 flex shrink-0 items-center justify-between gap-2 text-xs">
         <span className="glass rounded-full px-3 py-1.5">سؤال {index + 1}/{total}</span>
         <span className="glass rounded-full px-3 py-1.5" style={{ color: cat.color }}>
           {cat.icon} {cat.label}
@@ -504,15 +504,15 @@ function PlayScreen({
       </header>
 
       {/* النتائج الحيّة */}
-      <div className={`mb-4 grid gap-2 ${mode === "duel" ? "grid-cols-2" : "grid-cols-1"}`}>
+      <div className={`mb-3 grid shrink-0 gap-2 ${mode === "duel" ? "grid-cols-2" : "grid-cols-1"}`}>
         {(mode === "duel" ? [0, 1] : [0]).map((i) => {
           const p = players[i as 0 | 1];
           const on = i === activePlayer && !needsBuzz;
           return (
-            <div key={i} className={`glass rounded-2xl px-4 py-2 ${on ? "glow-gold" : "opacity-70"}`}>
+            <div key={i} className={`glass rounded-2xl px-4 py-1.5 ${on ? "glow-gold" : "opacity-70"}`}>
               <div className="flex items-center justify-between">
                 <span className="truncate text-xs text-jasmine/70">{p.name}</span>
-                <span className="font-display text-xl text-goldsoft">{p.score}</span>
+                <span className="font-display text-lg text-goldsoft">{p.score}</span>
               </div>
               {p.streak >= 2 && <div className="text-[10px] text-gold">🔥 سلسلة ×{p.streak}</div>}
             </div>
@@ -521,7 +521,7 @@ function PlayScreen({
       </div>
 
       {/* المؤقّت */}
-      <div className="mb-5">
+      <div className="mb-3 shrink-0">
         <div className="mb-1 flex items-center justify-between text-[11px] text-jasmine/60">
           <span>{item.kind === "double" ? "⭐ سؤال مضاعف ×2" : item.kind === "clash" ? "⚡ جولة المواجهة" : "الوقت المتبقّي"}</span>
           <span className={urgent ? "font-bold text-destructive" : ""}>{Math.max(0, remaining)} ثا</span>
@@ -541,16 +541,16 @@ function PlayScreen({
 
       {/* جولة المواجهة: من يضغط أولاً */}
       {needsBuzz ? (
-        <div className="anim-in glass flex flex-1 flex-col items-center justify-center gap-5 rounded-3xl p-6 text-center">
-          <div className="text-5xl">⚡</div>
-          <h3 className="font-display text-3xl gold-text">جولة المواجهة</h3>
-          <p className="text-sm text-jasmine/70">من يعرف الجواب؟ اضغط زرّك أولاً — النقاط ×1.5 والوقت 10 ثوانٍ فقط.</p>
+        <div className="anim-in glass flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-3xl p-5 text-center">
+          <div className="text-4xl">⚡</div>
+          <h3 className="font-display text-2xl gold-text">جولة المواجهة</h3>
+          <p className="text-xs text-jasmine/70">من يعرف الجواب؟ اضغط زرّك أولاً — النقاط ×1.5 والوقت 10 ثوانٍ فقط.</p>
           <div className="grid w-full grid-cols-2 gap-3">
             {[0, 1].map((i) => (
               <button
                 key={i}
                 onClick={() => onBuzz(i as 0 | 1)}
-                className="anim-ring rounded-2xl border border-gold/40 bg-white/5 px-4 py-8 font-display text-xl text-goldsoft transition hover:scale-105 active:scale-95"
+                className="anim-ring rounded-2xl border border-gold/40 bg-white/5 px-4 py-6 font-display text-lg text-goldsoft transition hover:scale-105 active:scale-95"
               >
                 {players[i as 0 | 1].name}
               </button>
@@ -558,15 +558,15 @@ function PlayScreen({
           </div>
         </div>
       ) : (
-        <>
-          <div key={item.key} className="anim-in glass mb-4 rounded-3xl p-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-3">
+          <div key={item.key} className="anim-in glass shrink-0 rounded-3xl px-4 py-3">
             {mode === "duel" && (
-              <p className="mb-2 text-[11px] text-gold">دور: {players[activePlayer].name}</p>
+              <p className="mb-1 text-[11px] text-gold">دور: {players[activePlayer].name}</p>
             )}
-            <h2 className="text-lg font-bold leading-relaxed text-jasmine sm:text-xl">{item.q.q}</h2>
+            <h2 className="text-base font-bold leading-relaxed text-jasmine sm:text-xl">{item.q.q}</h2>
           </div>
 
-          <div className="grid gap-3">
+          <div className="grid min-h-0 flex-1 grid-rows-4 gap-2">
             {item.opts.map((o, i) => {
               const isAns = o === item.ans;
               const isPicked = o === picked;
@@ -577,7 +577,7 @@ function PlayScreen({
                   disabled={locked}
                   onMouseEnter={() => sfx.hover()}
                   onClick={() => onAnswer(o)}
-                  className={`group relative flex items-center gap-3 rounded-2xl border px-4 py-4 text-right transition ${
+                  className={`group relative flex min-h-0 items-center gap-3 overflow-hidden rounded-2xl border px-4 py-2 text-right transition ${
                     state === "idle"
                       ? "glass hover:scale-[1.02] hover:border-gold/60"
                       : state === "right"
@@ -590,45 +590,52 @@ function PlayScreen({
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-current/30 text-xs font-bold">
                     {["أ", "ب", "ج", "د"][i] ?? i + 1}
                   </span>
-                  <span className="flex-1 text-sm leading-relaxed sm:text-base">{o}</span>
+                  <span className="flex-1 text-sm leading-snug sm:text-base">{o}</span>
                   {state === "right" && <span>✔</span>}
                   {state === "wrong" && <span>✖</span>}
                 </button>
               );
             })}
           </div>
-        </>
+        </div>
       )}
 
-      {/* لوحة النتيجة بعد الإجابة */}
+      {/* لوحة النتيجة — طبقة عائمة فوق الشاشة بلا أي تمرير */}
       {feedback && (
-        <div className="anim-in glass glow-gold mt-5 rounded-3xl p-5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className={`font-display text-2xl ${feedback.ok ? "text-emerald-300" : "text-rose-300"}`}>
-                {feedback.ok ? "إجابة صحيحة" : feedback.timeout ? "انتهى الوقت" : "إجابة خاطئة"}
-              </p>
-              <p className="mt-1 text-sm text-jasmine/80">{feedback.msg}</p>
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-night/70 p-4 backdrop-blur-sm">
+          <div className="anim-in glass glow-gold w-full max-w-lg rounded-3xl p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className={`font-display text-2xl ${feedback.ok ? "text-emerald-300" : "text-rose-300"}`}>
+                  {feedback.ok ? "إجابة صحيحة" : feedback.timeout ? "انتهى الوقت" : "إجابة خاطئة"}
+                </p>
+                <p className="mt-1 text-sm text-jasmine/80">{feedback.msg}</p>
+              </div>
+              {feedback.gained > 0 && (
+                <span className="anim-pop shrink-0 rounded-full bg-gold/20 px-3 py-1 font-bold text-gold">+{feedback.gained}</span>
+              )}
             </div>
-            {feedback.gained > 0 && (
-              <span className="anim-pop shrink-0 rounded-full bg-gold/20 px-3 py-1 font-bold text-gold">+{feedback.gained}</span>
+            {!feedback.ok && (
+              <p className="mt-2 text-sm text-emerald-300">الإجابة الصحيحة: {item.ans}</p>
             )}
+            {streak >= 3 && feedback.ok && (
+              <p className="mt-2 text-xs text-gold">{pickMsg(STREAK_MSGS, "st")}</p>
+            )}
+            <p className="mt-3 max-h-32 overflow-y-auto rounded-2xl bg-white/5 p-3 text-xs leading-relaxed text-jasmine/70">💡 {item.q.e}</p>
+            <button
+              autoFocus
+              onClick={onNext}
+              className="mt-4 w-full rounded-full bg-gradient-to-l from-gold to-goldsoft py-3 font-extrabold text-night transition hover:scale-[1.02]"
+            >
+              {index + 1 >= total ? "عرض النتيجة" : "السؤال التالي"}
+            </button>
           </div>
-          {streak >= 3 && feedback.ok && (
-            <p className="mt-2 text-xs text-gold">{pickMsg(STREAK_MSGS, "st")}</p>
-          )}
-          <p className="mt-3 rounded-2xl bg-white/5 p-3 text-xs leading-relaxed text-jasmine/70">💡 {item.q.e}</p>
-          <button
-            onClick={onNext}
-            className="mt-4 w-full rounded-full bg-gradient-to-l from-gold to-goldsoft py-3 font-extrabold text-night transition hover:scale-[1.02]"
-          >
-            {index + 1 >= total ? "عرض النتيجة" : "السؤال التالي"}
-          </button>
         </div>
       )}
     </section>
   );
 }
+
 
 function Results({
   mode,
