@@ -1,13 +1,17 @@
 /**
  * يبني نسخة ثابتة (Static) من اللعبة داخل مجلد dist-static
  * تُستخدم لتغليف التطبيق كـ APK عبر Capacitor / GitHub Actions.
+ *
+ * لا يعتمد على تشغيل خادم SSR إطلاقاً: يستخدم النسخة المستقلة
+ * public/tahaddi-standalone.html كصفحة index.html (تعمل دون إنترنت بالكامل).
  */
-import { spawn } from "node:child_process";
-import { cp, mkdir, rm, writeFile, access } from "node:fs/promises";
+import { cp, mkdir, rm, copyFile, access, readdir } from "node:fs/promises";
 import path from "node:path";
 
 const root = process.cwd();
 const OUT = path.join(root, "dist-static");
+const PUBLIC = path.join(root, "public");
+const STANDALONE = path.join(PUBLIC, "tahaddi-standalone.html");
 
 const exists = async (p) => {
   try {
@@ -18,56 +22,25 @@ const exists = async (p) => {
   }
 };
 
-const run = (cmd, args) =>
-  new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { stdio: "inherit", shell: process.platform === "win32" });
-    p.on("exit", (c) => (c === 0 ? resolve() : reject(new Error(`${cmd} exited with ${c}`))));
-  });
-
-const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-
 async function main() {
-  await run("npx", ["vite", "build"]);
-
-  const publicDir = (await exists(path.join(root, ".output/public")))
-    ? path.join(root, ".output/public")
-    : path.join(root, "dist/client");
-
-  if (!(await exists(publicDir))) throw new Error("لم يُعثر على مخرجات البناء");
+  if (!(await exists(STANDALONE))) {
+    throw new Error("لم يُعثر على public/tahaddi-standalone.html");
+  }
 
   await rm(OUT, { recursive: true, force: true });
   await mkdir(OUT, { recursive: true });
-  await cp(publicDir, OUT, { recursive: true });
+  await cp(PUBLIC, OUT, { recursive: true });
 
-  // تشغيل خادم الإخراج مؤقتاً لالتقاط صفحة HTML جاهزة للعمل دون إنترنت
-  const serverEntry = path.join(root, ".output/server/index.mjs");
-  let html = null;
-  if (await exists(serverEntry)) {
-    const srv = spawn("node", [serverEntry], {
-      stdio: "ignore",
-      env: { ...process.env, PORT: "3123", HOST: "127.0.0.1" },
-    });
-    try {
-      for (let i = 0; i < 40; i++) {
-        try {
-          const res = await fetch("http://127.0.0.1:3123/");
-          if (res.ok) {
-            html = await res.text();
-            break;
-          }
-        } catch {
-          /* لم يبدأ بعد */
-        }
-        await wait(500);
-      }
-    } finally {
-      srv.kill("SIGKILL");
-    }
-  }
+  // صفحة البداية للتطبيق = اللعبة المستقلة
+  await copyFile(STANDALONE, path.join(OUT, "index.html"));
 
-  if (!html) throw new Error("تعذّر توليد index.html الثابت");
-  await writeFile(path.join(OUT, "index.html"), html, "utf8");
-  console.log("✅ dist-static جاهز للتغليف كـ APK");
+  // إزالة عامل الخدمة داخل التطبيق (غير مطلوب ويسبب تخزيناً مزدوجاً)
+  await rm(path.join(OUT, "sw.js"), { force: true });
+
+  const files = await readdir(OUT);
+  if (!files.includes("index.html")) throw new Error("تعذّر توليد index.html الثابت");
+
+  console.log("✅ dist-static جاهز للتغليف كـ APK —", files.length, "عنصراً");
 }
 
 main().catch((e) => {
