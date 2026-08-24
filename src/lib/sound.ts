@@ -202,7 +202,7 @@ class SoundEngine {
     let i = 0;
     const timer = window.setInterval(() => {
       if (this.muted) return;
-      const f = scale[Math.floor(Math.random() * scale.length)];
+      const f = scale[Math.floor(Math.random() * scale.length)] ?? 392;
       this.tone(f, 2.4, { type: "sine", gain: 0.05, dest: g });
       i++;
       if (i % 4 === 0) this.tone(f / 2, 3.2, { type: "triangle", gain: 0.035, dest: g });
