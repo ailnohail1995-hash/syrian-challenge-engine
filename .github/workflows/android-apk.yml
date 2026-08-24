@@ -1,0 +1,67 @@
+name: بناء تطبيق أندرويد (APK)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: تثبيت الحزم
+        run: bun install
+
+      - name: بناء نسخة الويب الثابتة
+        run: node scripts/build-static.mjs
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+
+      - name: تجهيز Capacitor
+        run: |
+          npm i --no-save @capacitor/cli@6 @capacitor/core@6 @capacitor/android@6
+          npx cap add android
+          npx cap sync android
+
+      - name: بناء APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug assembleRelease
+
+      - name: رفع الحزم
+        uses: actions/upload-artifact@v4
+        with:
+          name: tahadi-al-ahya-apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: إصدار تلقائي
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: تحدّي الأحياء — إصدار ${{ github.run_number }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
