@@ -1,0 +1,12 @@
+{
+  "name": "تحدّي الأحياء — دمشق",
+  "short_name": "تحدّي الأحياء",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0b0f1a",
+  "theme_color": "#0b0f1a",
+  "icons": [{ "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }]
+}
