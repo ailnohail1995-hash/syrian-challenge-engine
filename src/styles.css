@@ -142,3 +142,102 @@
     color: var(--color-foreground);
   }
 }
+
+/* ============ تحدّي الأحياء — هوية دمشقية فاخرة ============ */
+:root {
+  --dmsc-night: oklch(0.16 0.035 268);
+  --dmsc-deep: oklch(0.21 0.045 272);
+  --dmsc-gold: oklch(0.82 0.14 85);
+  --dmsc-gold-soft: oklch(0.9 0.09 88);
+  --dmsc-jasmine: oklch(0.96 0.02 95);
+  --dmsc-teal: oklch(0.72 0.11 190);
+
+  --cat-damascus: oklch(0.82 0.14 85);
+  --cat-environment: oklch(0.76 0.15 155);
+  --cat-development: oklch(0.74 0.13 235);
+  --cat-initiative: oklch(0.75 0.16 25);
+
+  --lev-easy: oklch(0.78 0.13 160);
+  --lev-medium: oklch(0.8 0.13 220);
+  --lev-hard: oklch(0.79 0.15 45);
+  --lev-legend: oklch(0.75 0.19 330);
+}
+
+@theme inline {
+  --color-night: var(--dmsc-night);
+  --color-deep: var(--dmsc-deep);
+  --color-gold: var(--dmsc-gold);
+  --color-goldsoft: var(--dmsc-gold-soft);
+  --color-jasmine: var(--dmsc-jasmine);
+  --color-teal: var(--dmsc-teal);
+  --font-display: "Rakkas", serif;
+  --font-body: "Tajawal", sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--dmsc-night);
+  color: var(--dmsc-jasmine);
+}
+
+.font-display { font-family: var(--font-display); }
+
+.dmsc-bg {
+  background:
+    radial-gradient(1200px 700px at 50% -10%, oklch(0.32 0.07 275 / 0.85), transparent 65%),
+    radial-gradient(900px 600px at 110% 110%, oklch(0.35 0.09 200 / 0.35), transparent 60%),
+    radial-gradient(700px 500px at -10% 90%, oklch(0.4 0.1 85 / 0.22), transparent 60%),
+    var(--dmsc-night);
+}
+
+.dmsc-pattern::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.13;
+  background-image:
+    linear-gradient(45deg, oklch(0.82 0.14 85 / 0.35) 25%, transparent 25%, transparent 75%, oklch(0.82 0.14 85 / 0.35) 75%),
+    linear-gradient(45deg, oklch(0.82 0.14 85 / 0.35) 25%, transparent 25%, transparent 75%, oklch(0.82 0.14 85 / 0.35) 75%);
+  background-size: 34px 34px;
+  background-position: 0 0, 17px 17px;
+  mask-image: radial-gradient(circle at 50% 40%, black, transparent 78%);
+}
+
+.glass {
+  background: linear-gradient(160deg, oklch(1 0 0 / 0.09), oklch(1 0 0 / 0.03));
+  border: 1px solid oklch(0.82 0.14 85 / 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.gold-text {
+  background: linear-gradient(100deg, var(--dmsc-gold-soft), var(--dmsc-gold), oklch(0.98 0.05 95), var(--dmsc-gold));
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: goldShift 6s ease-in-out infinite;
+}
+
+@keyframes goldShift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+.glow-gold { box-shadow: 0 0 0 1px oklch(0.82 0.14 85 / 0.35), 0 18px 50px -12px oklch(0.82 0.14 85 / 0.45); }
+
+@keyframes floatUp { from { opacity: 0; transform: translateY(24px) scale(0.97); } to { opacity: 1; transform: none; } }
+.anim-in { animation: floatUp 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+
+@keyframes popIn { 0% { opacity:0; transform: scale(0.8);} 60% { transform: scale(1.05);} 100% { opacity:1; transform: scale(1);} }
+.anim-pop { animation: popIn 0.45s cubic-bezier(0.22,1,0.36,1) both; }
+
+@keyframes shakeX { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+.anim-shake { animation: shakeX 0.45s ease; }
+
+@keyframes pulseRing { 0%{box-shadow:0 0 0 0 oklch(0.82 0.14 85 / 0.5)} 100%{box-shadow:0 0 0 22px oklch(0.82 0.14 85 / 0)} }
+.anim-ring { animation: pulseRing 1.6s ease-out infinite; }
+
+@keyframes shimmer { 0%{transform:translateX(-120%)} 100%{transform:translateX(220%)} }
+.shimmer::after {
+  content:""; position:absolute; inset:0; width:40%;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 0.22), transparent);
+  animation: shimmer 2.6s ease-in-out infinite;
+}
