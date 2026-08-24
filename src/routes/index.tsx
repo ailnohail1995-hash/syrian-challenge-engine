@@ -353,7 +353,7 @@ function ModeScreen({
   );
 
   return (
-    <section className="anim-in flex flex-1 flex-col justify-center">
+    <section className="anim-in flex min-h-0 flex-1 flex-col justify-center overflow-y-auto">
       <h2 className="mb-1 text-center font-display text-4xl gold-text">اختر نمط اللعب</h2>
       <p className="mb-7 text-center text-sm text-jasmine/60">تلعب وحدك… أم تُثبت تفوّقك أمام خصم؟</p>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -388,7 +388,7 @@ function SetupScreen({
   onBack: () => void;
 }) {
   return (
-    <section className="anim-in flex flex-1 flex-col justify-center">
+    <section className="anim-in flex min-h-0 flex-1 flex-col justify-center overflow-y-auto">
       <h2 className="mb-1 text-center font-display text-4xl gold-text">درجة التحدّي</h2>
       <p className="mb-6 text-center text-sm text-jasmine/60">كل مستوى يغيّر الأسئلة والوقت والنقاط.</p>
 
