@@ -14,10 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -29,14 +25,8 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
-      - name: تثبيت الحزم
-        run: bun install
-
       - name: بناء نسخة الويب الثابتة
         run: node scripts/build-static.mjs
-        env:
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
       - name: تجهيز Capacitor
         run: |
