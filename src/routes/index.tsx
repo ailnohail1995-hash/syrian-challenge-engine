@@ -231,7 +231,7 @@ function Index() {
         </div>
       )}
 
-      <div className="relative z-10 mx-auto flex h-full w-full max-w-3xl flex-col overflow-hidden px-4 py-4">
+      <div className="relative z-10 mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden px-4 py-3">
 
         {phase === "intro" && <Intro onStart={() => { sfx.unlock(); sfx.select(); setPhase("mode"); }} />}
 
@@ -296,17 +296,17 @@ function Index() {
 
 function Intro({ onStart }: { onStart: () => void }) {
   return (
-    <section className="anim-in flex flex-1 flex-col items-center justify-center text-center">
-      <div className="anim-ring mb-6 flex h-24 w-24 items-center justify-center rounded-full border border-gold/40 text-5xl">
+    <section className="anim-in flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden text-center">
+      <div className="anim-ring mb-3 flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-gold/40 text-3xl sm:mb-5 sm:h-24 sm:w-24 sm:text-5xl">
         🏛️
       </div>
       <p className="mb-2 text-xs tracking-[0.4em] text-goldsoft/70">محافظة دمشق تقدّم</p>
-      <h1 className="gold-text font-display text-5xl leading-tight sm:text-7xl">تحدّي الأحياء</h1>
-      <p className="mt-4 max-w-md text-sm leading-relaxed text-jasmine/75 sm:text-base">
+      <h1 className="gold-text font-display text-4xl leading-tight sm:text-6xl lg:text-7xl">تحدّي الأحياء</h1>
+      <p className="mt-3 hidden max-w-md text-sm leading-relaxed text-jasmine/75 sm:block sm:text-base">
         رحلة معرفية في دمشق والبيئة والتنمية والمبادرة… أسئلة لا تتكرّر، إجابات تتبدّل أماكنها، ووقتٌ لا يرحم.
       </p>
 
-      <div className="mt-8 grid w-full max-w-sm grid-cols-4 gap-2">
+      <div className="mt-5 grid w-full max-w-sm shrink-0 grid-cols-4 gap-2">
         {(Object.keys(CATS) as Cat[]).map((c) => (
           <div key={c} className="glass rounded-2xl px-2 py-3 text-center">
             <div className="text-xl">{CATS[c].icon}</div>
@@ -317,11 +317,11 @@ function Intro({ onStart }: { onStart: () => void }) {
 
       <button
         onClick={onStart}
-        className="shimmer glow-gold relative mt-9 overflow-hidden rounded-full bg-gradient-to-l from-gold to-goldsoft px-12 py-4 text-lg font-extrabold text-night transition hover:scale-105 active:scale-95"
+        className="shimmer glow-gold relative mt-6 shrink-0 overflow-hidden rounded-full bg-gradient-to-l from-gold to-goldsoft px-10 py-3 text-base font-extrabold text-night transition hover:scale-105 active:scale-95 sm:mt-8 sm:px-12 sm:py-4 sm:text-lg"
       >
         ابدأ التحدّي
       </button>
-      <p className="mt-5 text-[11px] text-jasmine/45">{BANK_SIZE} سؤالاً في البنك · أربعة مستويات</p>
+      <p className="mt-3 text-[11px] text-jasmine/45">{BANK_SIZE} سؤالاً في البنك · أربعة مستويات</p>
     </section>
   );
 }
@@ -670,9 +670,9 @@ function Results({
   );
 
   return (
-    <section className="anim-in flex flex-1 flex-col justify-center py-6">
+    <section className="anim-in flex min-h-0 flex-1 flex-col justify-center overflow-y-auto py-2">
       <p className="text-center text-xs tracking-[0.35em] text-goldsoft/70">انتهى التحدّي</p>
-      <h2 className="mb-6 text-center font-display text-5xl gold-text">
+      <h2 className="mb-4 text-center font-display text-3xl gold-text sm:text-5xl">
         {mode === "duel" ? (winner === null ? "تعادل مشرّف" : `الفائز: ${players[winner].name}`) : "نتيجتك"}
       </h2>
 
@@ -698,7 +698,7 @@ function Results({
         ))}
       </div>
 
-      <div className="mt-8 flex flex-wrap justify-center gap-3">
+      <div className="mt-5 flex shrink-0 flex-wrap justify-center gap-3">
         <button onClick={onReplay} className="shimmer glow-gold relative overflow-hidden rounded-full bg-gradient-to-l from-gold to-goldsoft px-10 py-3 font-extrabold text-night transition hover:scale-105">
           مباراة جديدة 🔁
         </button>
