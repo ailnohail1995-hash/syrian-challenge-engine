@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>تحدّي الأحياء — لعبة دمشق المعرفية</title>
+<meta name="description" content="لعبة تفاعلية عن دمشق والبيئة والتنمية والمبادرة — نسخة مستقلة تعمل بملف واحد دون إنترنت." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🏛️</text></svg>" />
+<style>
+:root{
+  --night:#0a1018; --night2:#101a26; --gold:#e0b64f; --goldsoft:#f3dda0; --jasmine:#f6f2e6;
+  --damascus:#e0b64f; --environment:#5fd6a5; --development:#78b7ff; --initiative:#ff9d6e;
+  --easy:#5fd6a5; --medium:#78b7ff; --hard:#ff9d6e; --legend:#f0a6ff;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  font-family:"Tajawal","Segoe UI",system-ui,sans-serif;color:var(--jasmine);
+  background:
+    radial-gradient(1200px 700px at 80% -10%, rgba(224,182,79,.16), transparent 60%),
+    radial-gradient(900px 600px at 10% 110%, rgba(120,183,255,.12), transparent 60%),
+    linear-gradient(160deg,var(--night),var(--night2));
+  overflow:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;opacity:.05;
+  background-image:radial-gradient(circle at 12px 12px, #fff 1.5px, transparent 1.6px);
+  background-size:24px 24px;
+}
+#app{position:relative;z-index:1;height:100dvh;max-width:60rem;margin:0 auto;padding:.9rem 1rem;display:flex;flex-direction:column;overflow:hidden}
+.screen{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;animation:in .45s ease both}
+@keyframes in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@keyframes ring{0%,100%{box-shadow:0 0 0 0 rgba(224,182,79,.45)}50%{box-shadow:0 0 0 14px rgba(224,182,79,0)}}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.pop{animation:pop .35s ease both}.shake{animation:shake .35s ease}.ring{animation:ring 2.2s ease-in-out infinite}
+.glass{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.12);backdrop-filter:blur(10px)}
+.glow{box-shadow:0 0 0 1px rgba(224,182,79,.45),0 12px 40px -12px rgba(224,182,79,.5);border-color:rgba(224,182,79,.6)!important}
+.gold{background:linear-gradient(100deg,#fff3cf,var(--gold),#b98d２c);background:linear-gradient(100deg,#fff3cf,var(--gold),#b98d2c);-webkit-background-clip:text;background-clip:text;color:transparent}
+h1,h2,h3,.num{font-family:"Rakkas","Tajawal",serif;font-weight:400}
+.btn{border:0;cursor:pointer;font-family:inherit;font-weight:800;color:#12181f;border-radius:999px;
+  background:linear-gradient(270deg,var(--gold),var(--goldsoft));padding:.8rem 2.4rem;font-size:1rem;
+  box-shadow:0 12px 30px -14px rgba(224,182,79,.9);transition:transform .15s}
+.btn:hover{transform:scale(1.04)}.btn:active{transform:scale(.96)}
+.btn.ghost{background:rgba(255,255,255,.06);color:rgba(246,242,230,.85);font-weight:600;border:1px solid rgba(255,255,255,.14);box-shadow:none}
+.pill{border-radius:999px;padding:.35rem .8rem;font-size:.72rem}
+.card{border-radius:1.5rem;padding:1.1rem;text-align:right;cursor:pointer;transition:transform .15s;color:inherit;font-family:inherit}
+.card:hover{transform:scale(1.02)}
+.grid{display:grid;gap:.75rem}
+.muted{color:rgba(246,242,230,.6)}
+input{width:100%;background:transparent;border:0;outline:0;color:var(--goldsoft);font-family:inherit;font-size:1rem}
+#mute{position:fixed;top:.8rem;left:.8rem;z-index:60;border-radius:999px;padding:.45rem .7rem;font-size:1.05rem;cursor:pointer;color:inherit}
+#toast{position:fixed;top:4.6rem;left:50%;transform:translateX(-50%);z-index:60;border-radius:1rem;padding:.6rem 1.1rem;
+  font-size:.82rem;color:var(--goldsoft);max-width:90%;text-align:center}
+.opt{display:flex;align-items:center;gap:.7rem;border-radius:1rem;padding:.55rem .9rem;text-align:right;cursor:pointer;
+  border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.05);color:inherit;font-family:inherit;font-size:.95rem;transition:transform .12s,background .2s;min-height:0}
+.opt:hover:not(:disabled){transform:scale(1.015);border-color:rgba(224,182,79,.6)}
+.opt .k{flex:0 0 auto;width:2rem;height:2rem;display:grid;place-items:center;border-radius:999px;border:1px solid currentColor;opacity:.75;font-size:.75rem;font-weight:700}
+.opt .t{flex:1;line-height:1.35}
+.opt.right{background:linear-gradient(270deg,rgba(16,185,129,.85),rgba(52,211,153,.7));color:#08120e;border-color:transparent}
+.opt.wrong{background:linear-gradient(270deg,rgba(225,29,72,.85),rgba(244,63,94,.7));border-color:transparent}
+.opt.dim{opacity:.4}
+.bar{height:.6rem;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:999px;transition:width 1s linear}
+#overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:1rem;
+  background:rgba(10,16,24,.75);backdrop-filter:blur(6px)}
+#overlay .box{width:100%;max-width:34rem;border-radius:1.5rem;padding:1.2rem}
+.hide{display:none!important}
+.stat{border-radius:.9rem;background:rgba(255,255,255,.06);padding:.5rem;text-align:center}
+.stat b{display:block;font-family:"Rakkas",serif;font-size:1.15rem;color:var(--goldsoft);font-weight:400}
+.stat span{font-size:.62rem;color:rgba(246,242,230,.55)}
+@media(min-width:640px){.sm2{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<button id="mute" class="glass">🔊</button>
+<div id="toast" class="glass glow hide"></div>
+<div id="app"></div>
+<div id="overlay" class="hide"><div class="box glass glow" id="obox"></div></div>
+
+<script>
+/* ================= بنك الأسئلة (مدمج بالكامل) ================= */
+const BANK = /*__QUESTIONS__*/null;
+window.QUESTION_BANK = BANK;
+
+/* ================= إعدادات ================= */
+const CATS = {
+  damascus:{label:"دمشق",icon:"🏛️",color:"var(--damascus)"},
+  environment:{label:"البيئة",icon:"🌿",color:"var(--environment)"},
+  development:{label:"التنمية",icon:"📈",color:"var(--development)"},
+  initiative:{label:"المبادرة",icon:"🚀",color:"var(--initiative)"},
+};
+const LEVELS = {
+  easy:{label:"اكتشاف",points:100,time:20,tone:"var(--easy)"},
+  medium:{label:"معرفة",points:200,time:16,tone:"var(--medium)"},
+  hard:{label:"تحليل",points:350,time:13,tone:"var(--hard)"},
+  legend:{label:"تحدّي الثقافة",points:700,time:11,tone:"var(--legend)"},
+};
+const DIFFS=[
+  {id:"normal",label:"رحلة المعرفة",hint:"تدرّج هادئ من الاكتشاف إلى التحليل",icon:"🕌"},
+  {id:"hard",label:"طريق المحترف",hint:"أسئلة تحليل أكثر ولحظات ضغط",icon:"⚔️"},
+  {id:"legend",label:"تحدّي الثقافة",hint:"نخبة فقط — أسئلة نادرة ووقت قصير",icon:"👑"},
+];
+const CORRECT=["إجابة تليق بك!","دمشقيّ أصيل 👏","معرفة دقيقة!","ممتاز… استمر!","هذا هو المستوى ✨"];
+const WRONG=["ليست هذه… ركّز أكثر.","قريب لكن لا.","اقرأ التعليل، ستفيدك المرة القادمة.","لا بأس — التعلّم يبدأ من الخطأ."];
+const TIMEOUTM=["انتهى الوقت ⏳","الوقت لا ينتظر أحداً.","سرعتك تحتاج تدريباً."];
+const STREAKM=["سلسلة مشتعلة 🔥","لا يوقفك شيء!","توهّج معرفي متواصل ✨"];
+const LEGENDM=["تحدّي الثقافة… ركّز جيداً 👑","سؤال النخبة — لا مجال للتخمين.","الآن نعرف من يستحق اللقب."];
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const BANK_SIZE=BANK.questions.length;
+
+/* ================= الصوت (Web Audio) ================= */
+const sfx=(()=>{let ctx=null,muted=false,music=null;
+  const AC=()=>{if(!ctx)ctx=new (window.AudioContext||window.webkitAudioContext)();if(ctx.state==="suspended")ctx.resume();return ctx;};
+  const tone=(f,d=.15,type="sine",g=.15,at=0)=>{if(muted)return;const c=AC(),o=c.createOscillator(),v=c.createGain();
+    o.type=type;o.frequency.setValueAtTime(f,c.currentTime+at);v.gain.setValueAtTime(0,c.currentTime+at);
+    v.gain.linearRampToValueAtTime(g,c.currentTime+at+.02);v.gain.exponentialRampToValueAtTime(.0001,c.currentTime+at+d);
+    o.connect(v);v.connect(c.destination);o.start(c.currentTime+at);o.stop(c.currentTime+at+d+.05);};
+  const seq=(ns,step=.09,type="triangle",g=.14)=>ns.forEach((f,i)=>tone(f,.22,type,g,i*step));
+  return{
+    setMuted(m){muted=m;if(m)this.stopMusic();},
+    unlock(){AC();},
+    click(){tone(520,.08,"square",.06);},
+    hover(){tone(880,.04,"sine",.025);},
+    select(){seq([523,784],.07);},
+    whoosh(){tone(300,.22,"sine",.05);},
+    tick(f){tone(f?1200:900,.05,"square",f?.09:.05);},
+    correct(){seq([659,880,1175],.08,"triangle",.16);},
+    wrong(){seq([220,164],.12,"sawtooth",.12);},
+    timeout(){seq([392,294,196],.13,"sine",.12);},
+    streak(){seq([784,988,1319,1568],.06,"triangle",.13);},
+    legend(){seq([440,554,659,880],.11,"sine",.13);},
+    clash(){seq([880,660,880],.06,"square",.12);},
+    countdown(n){n>0?tone(660,.12,"triangle",.14):seq([784,1046],.1);},
+    victory(){seq([523,659,784,1046,1318],.12,"triangle",.16);},
+    startMusic(){if(muted||music)return;const c=AC();const notes=[293.66,311.13,369.99,392,415.30,466.16,523.25,587.33];
+      let i=0;music=setInterval(()=>{if(muted)return;tone(notes[i%notes.length]/2,.5,"sine",.035);i++;},620);},
+    stopMusic(){if(music){clearInterval(music);music=null;}},
+  };})();
+
+/* ================= المحرك ================= */
+const shuffle=a=>{const x=[...a];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]];}return x;};
+const POOL={};
+for(const q of BANK.questions){(POOL[q.category+"|"+q.level]??=[]).push(q);}
+const SEEN_KEY="tahaddi_seen_html_v1";
+const loadSeen=()=>{try{return new Set(JSON.parse(localStorage.getItem(SEEN_KEY)||"[]"));}catch{return new Set();}};
+const saveSeen=s=>{try{localStorage.setItem(SEEN_KEY,JSON.stringify([...s]));}catch{}};
+const ladder=d=>d==="legend"?["medium","hard","hard","legend","hard","legend","hard","legend","legend","legend"]
+  :d==="hard"?["easy","medium","medium","hard","medium","hard","hard","hard","legend","legend"]
+  :["easy","easy","medium","easy","medium","medium","hard","hard","hard","legend"];
+
+function makePicker(){const seen=loadSeen(),used=new Set();
+  return (lev,cat)=>{
+    const cats=cat?[cat]:shuffle(Object.keys(CATS));
+    const gather=allowSeen=>{const out=[];for(const c of cats)for(const q of (POOL[c+"|"+lev]||[])){
+      if(used.has(q.id))continue;if(!allowSeen&&seen.has(q.id))continue;out.push(q);}return out;};
+    let p=gather(false);if(!p.length)p=gather(true);
+    if(!p.length)p=BANK.questions.filter(q=>q.level===lev&&!used.has(q.id));
+    const q=p[Math.floor(Math.random()*p.length)]||BANK.questions[0];
+    used.add(q.id);seen.add(q.id);saveSeen(seen);return q;};
+}
+function makeItem(q,player,kind,i){const m=LEVELS[q.level];
+  return{key:q.id+"-"+i+"-"+Math.random().toString(36).slice(2,6),q,opts:shuffle(q.options),ans:q.answer,
+    level:q.level,cat:q.category,points:Math.round(m.points*(kind==="clash"?1.5:1)),
+    time:kind==="clash"?10:m.time,player,kind};}
+function buildRound(mode,diff){
+  const pk=makePicker(),plan=ladder(diff),cyc=shuffle(Object.keys(CATS)),items=[];
+  if(mode==="solo"){
+    plan.forEach((lev,i)=>{const kind=(lev==="legend"&&i===plan.length-1)?"legend":"normal";
+      items.push(makeItem(pk(lev,cyc[i%cyc.length]),0,kind,i));});
+    items.splice(plan.length-2,0,makeItem(pk("hard"),0,"double",99));
+    return items;}
+  plan.slice(0,5).forEach((lev,i)=>{
+    items.push(makeItem(pk(lev,cyc[(i*2)%cyc.length]),0,"normal",i*2));
+    items.push(makeItem(pk(lev,cyc[(i*2+1)%cyc.length]),1,"normal",i*2+1));});
+  items.push(makeItem(pk("hard"),null,"clash",50));
+  items.push(makeItem(pk("legend"),0,"legend",60));
+  items.push(makeItem(pk("legend"),1,"legend",61));
+  return items;}
+const scoreFor=(it,rem,streak)=>{const r=Math.max(0,Math.min(1,rem/it.time));
+  const mul=streak>=5?1.5:streak>=3?1.25:1;
+  return Math.round(it.points*(1+r*.25)*mul*(it.kind==="double"?2:1));};
+function identityFor(score,correct,total,bestCat,legend){
+  const acc=total?correct/total:0;
+  if(acc>=.9&&legend)return{t:"موسوعة الشام",i:"👑",l:"معرفة نادرة… أنت مرجع لا لاعب."};
+  if(acc>=.75){
+    if(bestCat==="damascus")return{t:"دمشقيّ المعرفة",i:"🏛️",l:"تعرف المدينة من تفاصيلها لا من صورها."};
+    if(bestCat==="environment")return{t:"واعي البيئة",i:"♻️",l:"تفهم أن البيئة قرار يومي لا شعار."};
+    if(bestCat==="development")return{t:"صديق التنمية",i:"🌱",l:"تقيس الأثر لا النشاط."};
+    return{t:"محلّل المبادرات",i:"🧠",l:"تبدأ من المشكلة لا من الحماس."};}
+  if(acc>=.5)return{t:"ابن الحارة",i:"🏘️",l:"أساس متين… ينقصك التعمّق قليلاً."};
+  if(score>0)return{t:"مستكشف",i:"🧭",l:"البداية دائماً من سؤال لم نعرف جوابه."};
+  return{t:"زائر جديد",i:"✨",l:"جرّب مرة أخرى — الأسئلة تتغيّر كلياً."};}
+
+/* ================= الحالة ================= */
+const S={phase:"intro",mode:"solo",diff:"normal",names:["اللاعب الأول","اللاعب الثاني"],
+  players:[np("اللاعب الأول"),np("اللاعب الثاني")],items:[],idx:0,remaining:20,picked:null,
+  locked:false,feedback:null,buzzer:null,count:3,muted:false};
+function np(n){return{name:n,score:0,correct:0,answered:0,streak:0,best:0,legend:false,
+  perCat:{damascus:0,environment:0,development:0,initiative:0}};}
+const app=document.getElementById("app"),overlay=document.getElementById("overlay"),
+  obox=document.getElementById("obox"),toastEl=document.getElementById("toast");
+let timer=null,toastT=null;
+const item=()=>S.items[S.idx];
+const active=()=>{const it=item();return it?(it.player!==null&&it.player!==undefined?it.player:(S.buzzer??0)):0;};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(msg,ms=2400){toastEl.textContent=msg;toastEl.classList.remove("hide");
+  clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.add("hide"),ms);}
+
+document.getElementById("mute").onclick=e=>{S.muted=!S.muted;sfx.setMuted(S.muted);
+  e.currentTarget.textContent=S.muted?"🔇":"🔊";if(!S.muted&&S.phase==="play")sfx.startMusic();};
+
+/* ================= الشاشات ================= */
+function render(){
+  if(S.phase==="intro")return intro();
+  if(S.phase==="mode")return modeScreen();
+  if(S.phase==="setup")return setup();
+  if(S.phase==="countdown")return countdown();
+  if(S.phase==="play")return play();
+  if(S.phase==="results")return results();
+}
+function go(p){S.phase=p;render();}
+
+function intro(){
+  app.innerHTML=`<section class="screen" style="align-items:center;text-align:center">
+    <div class="ring" style="width:4.5rem;height:4.5rem;display:grid;place-items:center;border-radius:999px;border:1px solid rgba(224,182,79,.4);font-size:2rem;margin-bottom:.8rem">🏛️</div>
+    <p style="font-size:.7rem;letter-spacing:.35em;color:rgba(243,221,160,.7)">محافظة دمشق تقدّم</p>
+    <h1 class="gold" style="font-size:clamp(2.4rem,7vw,4.5rem);line-height:1.15">تحدّي الأحياء</h1>
+    <p class="muted" style="max-width:32rem;margin-top:.6rem;font-size:.9rem;line-height:1.7">رحلة معرفية في دمشق والبيئة والتنمية والمبادرة… أسئلة لا تتكرّر، إجابات تتبدّل أماكنها، ووقتٌ لا يرحم.</p>
+    <div class="grid" style="grid-template-columns:repeat(4,1fr);max-width:24rem;width:100%;margin-top:1.2rem">
+      ${Object.keys(CATS).map(c=>`<div class="glass" style="border-radius:1rem;padding:.6rem .2rem">
+        <div style="font-size:1.3rem">${CATS[c].icon}</div><div style="font-size:.68rem" class="muted">${CATS[c].label}</div></div>`).join("")}
+    </div>
+    <button class="btn" id="go" style="margin-top:1.4rem">ابدأ التحدّي</button>
+    <p class="muted" style="margin-top:.7rem;font-size:.68rem">${BANK_SIZE} سؤالاً في البنك · أربعة مستويات · يعمل دون إنترنت</p>
+  </section>`;
+  app.querySelector("#go").onclick=()=>{sfx.unlock();sfx.select();go("mode");};
+}
+
+function modeScreen(){
+  const c=(m,icon,t,d)=>`<button class="card glass ${S.mode===m?"glow":""}" data-m="${m}" style="${S.mode===m?"":"opacity:.8"}">
+    <div style="font-size:2rem">${icon}</div><h3 style="font-size:1.4rem;color:var(--goldsoft);margin-top:.4rem">${t}</h3>
+    <p class="muted" style="font-size:.82rem;margin-top:.4rem;line-height:1.6">${d}</p></button>`;
+  app.innerHTML=`<section class="screen">
+    <h2 class="gold" style="text-align:center;font-size:2.2rem">اختر نمط اللعب</h2>
+    <p class="muted" style="text-align:center;font-size:.85rem;margin-bottom:1.4rem">تلعب وحدك… أم تُثبت تفوّقك أمام خصم؟</p>
+    <div class="grid sm2">${c("solo","🧭","فردي","سلّم تصاعدي من 11 سؤالاً مع سؤال مفاجأة مضاعف وختام من تحدّي الثقافة.")}
+    ${c("duel","⚔️","ثنائي","لاعبان بالتناوب، جولة مواجهة ⚡ بنقاط مضاعفة، وسؤالا نخبة في الختام.")}</div>
+    <div style="display:flex;justify-content:space-between;margin-top:1.6rem;gap:.7rem">
+      <button class="btn ghost" id="back">رجوع</button><button class="btn" id="next">التالي</button></div>
+  </section>`;
+  app.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>{sfx.select();S.mode=b.dataset.m;modeScreen();});
+  app.querySelector("#back").onclick=()=>{sfx.click();go("intro");};
+  app.querySelector("#next").onclick=()=>{sfx.click();go("setup");};
+}
+
+function setup(){
+  app.innerHTML=`<section class="screen">
+    <h2 class="gold" style="text-align:center;font-size:2.2rem">درجة التحدّي</h2>
+    <p class="muted" style="text-align:center;font-size:.85rem;margin-bottom:1.1rem">كل مستوى يغيّر الأسئلة والوقت والنقاط.</p>
+    <div class="grid">${DIFFS.map(d=>`<button class="card glass ${S.diff===d.id?"glow":""}" data-d="${d.id}"
+      style="display:flex;align-items:center;gap:.9rem;padding:.8rem 1rem;${S.diff===d.id?"":"opacity:.8"}">
+      <span style="font-size:1.7rem">${d.icon}</span><span style="flex:1">
+      <b style="display:block;font-family:Rakkas,serif;font-weight:400;font-size:1.15rem;color:var(--goldsoft)">${d.label}</b>
+      <span class="muted" style="font-size:.72rem">${d.hint}</span></span>
+      ${S.diff===d.id?'<span style="color:var(--gold)">✔</span>':""}</button>`).join("")}</div>
+    <div class="grid sm2" style="margin-top:1rem">
+      <label class="glass" style="border-radius:1rem;padding:.55rem .9rem">
+        <span class="muted" style="font-size:.66rem">اسم اللاعب الأول</span>
+        <input id="n0" maxlength="18" value="${esc(S.names[0])}" /></label>
+      ${S.mode==="duel"?`<label class="glass" style="border-radius:1rem;padding:.55rem .9rem">
+        <span class="muted" style="font-size:.66rem">اسم اللاعب الثاني</span>
+        <input id="n1" maxlength="18" value="${esc(S.names[1])}" /></label>`:""}
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:1.5rem;gap:.7rem">
+      <button class="btn ghost" id="back">رجوع</button><button class="btn" id="start">انطلق 🚀</button></div>
+  </section>`;
+  app.querySelectorAll("[data-d]").forEach(b=>b.onclick=()=>{sfx.select();S.diff=b.dataset.d;setup();});
+  const n0=app.querySelector("#n0"),n1=app.querySelector("#n1");
+  n0.oninput=e=>S.names[0]=e.target.value; if(n1)n1.oninput=e=>S.names[1]=e.target.value;
+  app.querySelector("#back").onclick=()=>{sfx.click();go("mode");};
+  app.querySelector("#start").onclick=start;
+}
+
+function start(){
+  sfx.unlock();sfx.startMusic();
+  S.items=buildRound(S.mode,S.diff);S.idx=0;S.picked=null;S.locked=false;S.feedback=null;S.buzzer=null;
+  S.players=[np(S.names[0]||"اللاعب الأول"),np(S.names[1]||"اللاعب الثاني")];
+  overlay.classList.add("hide");
+  S.count=3;go("countdown");
+}
+
+function countdown(){
+  const draw=()=>{app.innerHTML=`<section class="screen" style="align-items:center;justify-content:center">
+    <div class="pop gold" style="font-family:Rakkas,serif;font-size:6rem;line-height:1">${S.count>0?S.count:"هيّا!"}</div></section>`;};
+  draw();sfx.countdown(S.count);
+  clearInterval(timer);
+  timer=setInterval(()=>{S.count--;sfx.countdown(S.count);draw();
+    if(S.count<=0){clearInterval(timer);setTimeout(()=>go("play"),650);}},850);
+}
+
+function startTimer(){
+  const it=item();if(!it)return;
+  clearInterval(timer);
+  if(it.kind==="clash"&&S.buzzer===null)return;
+  S.remaining=it.time;paintTimer();
+  timer=setInterval(()=>{S.remaining--;paintTimer();
+    if(S.remaining<=5&&S.remaining>0)sfx.tick(S.remaining<=3);
+    if(S.remaining<=0){clearInterval(timer);onTimeout();}},1000);
+}
+function paintTimer(){
+  const it=item(),bar=document.getElementById("bar"),lbl=document.getElementById("secs");
+  if(!it||!bar)return;
+  const pct=Math.max(0,Math.min(1,S.remaining/it.time)),urgent=S.remaining<=5&&!S.locked;
+  bar.style.width=(pct*100)+"%";
+  bar.style.background=urgent?"linear-gradient(90deg,#f43f5e,#fb923c)":`linear-gradient(90deg,${LEVELS[it.level].tone},var(--gold))`;
+  lbl.textContent=Math.max(0,S.remaining)+" ثا";
+  lbl.style.color=urgent?"#fb7185":"";
+}
+
+function play(){
+  const it=item();if(!it)return go("results");
+  const cat=CATS[it.cat],lev=LEVELS[it.level],p=S.players[active()];
+  const needBuzz=it.kind==="clash"&&S.buzzer===null;
+  app.innerHTML=`<section style="flex:1;min-height:0;display:flex;flex-direction:column">
+    <header style="display:flex;justify-content:space-between;gap:.4rem;font-size:.7rem;flex:0 0 auto">
+      <span class="glass pill">سؤال ${S.idx+1}/${S.items.length}</span>
+      <span class="glass pill" style="color:${cat.color}">${cat.icon} ${cat.label}</span>
+      <span class="glass pill" style="color:${lev.tone}">${lev.label}</span></header>
+    <div class="grid" style="grid-template-columns:repeat(${S.mode==="duel"?2:1},1fr);margin:.6rem 0;flex:0 0 auto">
+      ${(S.mode==="duel"?[0,1]:[0]).map(i=>{const pl=S.players[i],on=i===active()&&!needBuzz;
+        return `<div class="glass ${on?"glow":""}" style="border-radius:1rem;padding:.35rem .8rem;${on?"":"opacity:.7"}">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span class="muted" style="font-size:.72rem">${esc(pl.name)}</span>
+            <span style="font-family:Rakkas,serif;font-size:1.1rem;color:var(--goldsoft)">${pl.score}</span></div>
+          ${pl.streak>=2?`<div style="font-size:.62rem;color:var(--gold)">🔥 سلسلة ×${pl.streak}</div>`:""}</div>`;}).join("")}
+    </div>
+    <div style="flex:0 0 auto;margin-bottom:.6rem">
+      <div style="display:flex;justify-content:space-between;font-size:.68rem;margin-bottom:.25rem" class="muted">
+        <span>${it.kind==="double"?"⭐ سؤال مضاعف ×2":it.kind==="clash"?"⚡ جولة المواجهة":"الوقت المتبقّي"}</span>
+        <span id="secs">${it.time} ثا</span></div>
+      <div class="bar"><i id="bar" style="width:100%"></i></div></div>
+    ${needBuzz?`<div class="glass screen" style="border-radius:1.5rem;align-items:center;text-align:center;gap:.8rem;padding:1rem">
+        <div style="font-size:2.2rem">⚡</div><h3 class="gold" style="font-size:1.6rem">جولة المواجهة</h3>
+        <p class="muted" style="font-size:.78rem">من يعرف الجواب؟ اضغط زرّك أولاً — النقاط ×1.5 والوقت 10 ثوانٍ فقط.</p>
+        <div class="grid" style="grid-template-columns:1fr 1fr;width:100%">
+          ${[0,1].map(i=>`<button class="ring" data-buzz="${i}" style="border-radius:1rem;border:1px solid rgba(224,182,79,.4);
+            background:rgba(255,255,255,.05);color:var(--goldsoft);font-family:Rakkas,serif;font-size:1.1rem;padding:1.2rem .5rem;cursor:pointer">
+            ${esc(S.players[i].name)}</button>`).join("")}</div></div>`
+      :`<div style="flex:1;min-height:0;display:flex;flex-direction:column;gap:.55rem">
+        <div class="glass pop" style="border-radius:1.25rem;padding:.7rem 1rem;flex:0 0 auto">
+          ${S.mode==="duel"?`<p style="font-size:.68rem;color:var(--gold);margin-bottom:.2rem">دور: ${esc(p.name)}</p>`:""}
+          <h2 style="font-family:Tajawal,sans-serif;font-weight:700;font-size:clamp(.95rem,2.4vw,1.3rem);line-height:1.6">${esc(it.q.question)}</h2></div>
+        <div class="grid" style="flex:1;min-height:0;grid-template-rows:repeat(${it.opts.length},1fr);gap:.5rem">
+          ${it.opts.map((o,i)=>`<button class="opt" data-opt="${i}">
+            <span class="k">${["أ","ب","ج","د"][i]||i+1}</span><span class="t">${esc(o)}</span></button>`).join("")}
+        </div></div>`}
+  </section>`;
+  app.querySelectorAll("[data-buzz]").forEach(b=>b.onclick=()=>{sfx.clash();S.buzzer=+b.dataset.buzz;play();});
+  app.querySelectorAll("[data-opt]").forEach(b=>{
+    b.onmouseenter=()=>sfx.hover();
+    b.onclick=()=>answer(it.opts[+b.dataset.opt],b);});
+  if(it.level==="legend"){sfx.legend();toast(pick(LEGENDM),2600);}else sfx.whoosh();
+  startTimer();
+}
+
+function commit(ok,gained,timeout){
+  const it=item(),p=S.players[active()];
+  p.answered++;
+  if(ok){p.correct++;p.score+=gained;p.streak++;p.best=Math.max(p.best,p.streak);
+    p.perCat[it.cat]++;if(it.level==="legend")p.legend=true;}
+  else p.streak=0;
+  S.feedback={ok,gained,timeout,msg:timeout?pick(TIMEOUTM):ok?pick(CORRECT):pick(WRONG)};
+  showFeedback();
+}
+function onTimeout(){if(S.locked)return;S.locked=true;sfx.timeout();markOptions(null);commit(false,0,true);}
+function answer(opt,btn){
+  const it=item();if(S.locked||!it)return;
+  clearInterval(timer);S.locked=true;S.picked=opt;
+  const ok=opt===it.ans,streak=S.players[active()].streak;
+  const gained=ok?scoreFor(it,S.remaining,streak):0;
+  if(ok){sfx.correct();if(streak+1>=3)setTimeout(()=>sfx.streak(),400);}else{sfx.wrong();btn.classList.add("shake");}
+  markOptions(opt);commit(ok,gained,false);
+}
+function markOptions(picked){
+  const it=item();
+  app.querySelectorAll("[data-opt]").forEach(b=>{
+    const o=it.opts[+b.dataset.opt];b.disabled=true;
+    b.classList.add(o===it.ans?"right":o===picked?"wrong":"dim");
+    if(o===it.ans)b.insertAdjacentHTML("beforeend","<span>✔</span>");
+    else if(o===picked)b.insertAdjacentHTML("beforeend","<span>✖</span>");});
+}
+function showFeedback(){
+  const it=item(),f=S.feedback,last=S.idx+1>=S.items.length,streak=S.players[active()].streak;
+  obox.innerHTML=`<div class="pop">
+    <div style="display:flex;justify-content:space-between;gap:.7rem;align-items:flex-start">
+      <div><p style="font-family:Rakkas,serif;font-size:1.6rem;color:${f.ok?"#6ee7b7":"#fda4af"}">
+        ${f.ok?"إجابة صحيحة":f.timeout?"انتهى الوقت":"إجابة خاطئة"}</p>
+        <p class="muted" style="font-size:.85rem;margin-top:.2rem">${esc(f.msg)}</p></div>
+      ${f.gained>0?`<span class="pop" style="border-radius:999px;background:rgba(224,182,79,.2);color:var(--gold);padding:.25rem .8rem;font-weight:700">+${f.gained}</span>`:""}
+    </div>
+    ${!f.ok?`<p style="margin-top:.5rem;font-size:.9rem;color:#6ee7b7">الإجابة الصحيحة: ${esc(it.ans)}</p>`:""}
+    ${f.ok&&streak>=3?`<p style="margin-top:.4rem;font-size:.75rem;color:var(--gold)">${pick(STREAKM)}</p>`:""}
+    <p style="margin-top:.7rem;max-height:8rem;overflow-y:auto;border-radius:1rem;background:rgba(255,255,255,.06);padding:.7rem;font-size:.78rem;line-height:1.7" class="muted">💡 ${esc(it.q.explanation||"")}</p>
+    <button class="btn" id="nx" style="width:100%;margin-top:.9rem">${last?"عرض النتيجة":"السؤال التالي"}</button></div>`;
+  overlay.classList.remove("hide");
+  const nx=obox.querySelector("#nx");nx.focus();nx.onclick=next;
+}
+function next(){
+  sfx.click();overlay.classList.add("hide");
+  S.picked=null;S.feedback=null;S.locked=false;S.buzzer=null;
+  if(S.idx+1>=S.items.length){sfx.stopMusic();sfx.victory();go("results");}
+  else{S.idx++;play();}
+}
+
+function results(){
+  const list=S.mode==="duel"?[0,1]:[0];
+  const w=S.mode==="duel"?(S.players[0].score===S.players[1].score?null:(S.players[0].score>S.players[1].score?0:1)):null;
+  app.innerHTML=`<section class="screen" style="overflow-y:auto">
+    <p class="muted" style="text-align:center;font-size:.68rem;letter-spacing:.3em">انتهى التحدّي</p>
+    <h2 class="gold" style="text-align:center;font-size:clamp(1.8rem,5vw,3rem);margin-bottom:.9rem">
+      ${S.mode==="duel"?(w===null?"تعادل مشرّف":"الفائز: "+esc(S.players[w].name)):"نتيجتك"}</h2>
+    <div class="grid ${S.mode==="duel"?"sm2":""}">
+    ${list.map(i=>{const p=S.players[i];
+      let bc=null;for(const c of Object.keys(p.perCat))if(bc===null||p.perCat[c]>p.perCat[bc])bc=c;
+      if(!p.perCat[bc])bc=null;
+      const id=identityFor(p.score,p.correct,p.answered,bc,p.legend);
+      return `<div class="glass ${w===i?"glow":""}" style="border-radius:1.5rem;padding:1rem;text-align:center">
+        <div style="font-size:2.4rem">${id.i}</div>
+        <h3 style="font-family:Rakkas,serif;font-size:1.4rem;color:var(--goldsoft);margin-top:.3rem">${id.t}</h3>
+        <p class="muted" style="font-size:.72rem;margin-top:.2rem">${id.l}</p>
+        <div class="gold" style="font-family:Rakkas,serif;font-size:2.8rem;margin:.6rem 0">${p.score}</div>
+        <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+          <div class="stat"><b>${p.correct}/${p.answered}</b><span>إجابات صحيحة</span></div>
+          <div class="stat"><b>${p.best}</b><span>أطول سلسلة</span></div>
+          <div class="stat"><b>${p.answered?Math.round(p.correct/p.answered*100):0}%</b><span>الدقّة</span></div></div>
+        ${bc?`<p class="muted" style="margin-top:.6rem;font-size:.74rem">أقوى مجال:
+          <span style="color:${CATS[bc].color}">${CATS[bc].icon} ${CATS[bc].label}</span></p>`:""}
+        <p class="muted" style="margin-top:.25rem;font-size:.64rem;opacity:.7">${esc(p.name)} · من أصل ${S.items.length} سؤالاً</p></div>`;}).join("")}
+    </div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:center;gap:.6rem;margin-top:1rem">
+      <button class="btn" id="again">مباراة جديدة 🔁</button>
+      <button class="btn ghost" id="home">الشاشة الرئيسية</button>
+      <button class="btn ghost" id="reset" style="font-size:.75rem">تصفير الأسئلة المستخدمة</button></div>
+    <p class="muted" style="text-align:center;margin-top:.8rem;font-size:.68rem">الأسئلة لا تتكرّر بين الجولات، ومواقع الإجابات تتبدّل في كل مرة.</p>
+  </section>`;
+  app.querySelector("#again").onclick=start;
+  app.querySelector("#home").onclick=()=>{sfx.stopMusic();sfx.click();go("intro");};
+  app.querySelector("#reset").onclick=()=>{localStorage.removeItem(SEEN_KEY);sfx.select();toast("تمّت تهيئة بنك الأسئلة من جديد ✨");};
+}
+
+render();
+</script>
+</body>
+</html>
