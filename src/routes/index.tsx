@@ -216,7 +216,7 @@ function Index() {
   };
 
   return (
-    <main className="dmsc-bg dmsc-pattern relative min-h-screen overflow-hidden">
+    <main className="dmsc-bg dmsc-pattern relative h-[100dvh] w-full overflow-hidden">
       <button
         onClick={toggleMute}
         aria-label={muted ? "تشغيل الصوت" : "كتم الصوت"}
@@ -231,7 +231,8 @@ function Index() {
         </div>
       )}
 
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-3xl flex-col px-4 py-6">
+      <div className="relative z-10 mx-auto flex h-full w-full max-w-3xl flex-col overflow-hidden px-4 py-4">
+
         {phase === "intro" && <Intro onStart={() => { sfx.unlock(); sfx.select(); setPhase("mode"); }} />}
 
         {phase === "mode" && (
