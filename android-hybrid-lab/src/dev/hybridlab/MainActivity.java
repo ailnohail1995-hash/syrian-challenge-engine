@@ -120,7 +120,10 @@ public final class MainActivity extends Activity {
         int width = Math.min(getResources().getDisplayMetrics().widthPixels, dp(580));
         centered.addView(homeCards, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER_HORIZONTAL));
         ImageView brand = new ImageView(this);
-        brand.setImageResource(R.drawable.salloum_icon);
+        Bitmap savedBrand = savedHubIcon();
+        if (savedBrand == null) brand.setImageResource(R.drawable.salloum_icon);
+        else brand.setImageBitmap(savedBrand);
+        brand.setScaleType(ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams brandSize = new LinearLayout.LayoutParams(dp(66), dp(66));
         brandSize.bottomMargin = dp(12);
         homeCards.addView(brand, brandSize);
@@ -453,9 +456,80 @@ public final class MainActivity extends Activity {
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
+    private Bitmap savedHubIcon() {
+        return android.graphics.BitmapFactory.decodeFile(new java.io.File(getFilesDir(), "hub-icon.png").getPath());
+    }
+
+    private void showHubIconSettings() {
+        String[] choices = {"اختيار صورة من الهاتف", "استعادة الأيقونة الأصلية", "إضافة اختصار إلى الشاشة الرئيسية"};
+        new AlertDialog.Builder(this).setTitle("أيقونة تطبيقات سلوم").setItems(choices, (dialog, item) -> {
+            if (item == 0) {
+                try {
+                    startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*")
+                            .addCategory(Intent.CATEGORY_OPENABLE), 27);
+                } catch (ActivityNotFoundException ex) { toast("اختيار الصور غير متاح."); }
+            } else if (item == 1) {
+                java.io.File icon = new java.io.File(getFilesDir(), "hub-icon.png");
+                if (icon.exists() && !deleteFile("hub-icon.png")) { toast("تعذر استعادة الأيقونة."); return; }
+                refreshHubIcon();
+            } else {
+                ShortcutManager manager = getSystemService(ShortcutManager.class);
+                if (!manager.isRequestPinShortcutSupported() || !manager.requestPinShortcut(hubShortcut(), null))
+                    toast("الشاشة الرئيسية لا تدعم إضافة اختصار من هنا.");
+            }
+        }).show();
+    }
+
+    private ShortcutInfo hubShortcut() {
+        Bitmap bitmap = savedHubIcon();
+        Icon icon = bitmap == null ? Icon.createWithResource(this, R.drawable.salloum_icon)
+                : Icon.createWithBitmap(bitmap);
+        return new ShortcutInfo.Builder(this, "salloum-home").setShortLabel("تطبيقات سلوم")
+                .setIcon(icon).setIntent(new Intent(Intent.ACTION_MAIN, null, this, MainActivity.class)).build();
+    }
+
+    private void refreshHubIcon() {
+        if (home.getVisibility() == View.VISIBLE) showHome();
+        ShortcutManager manager = getSystemService(ShortcutManager.class);
+        for (ShortcutInfo shortcut : manager.getPinnedShortcuts()) {
+            if ("salloum-home".equals(shortcut.getId())) {
+                manager.updateShortcuts(java.util.Collections.singletonList(hubShortcut()));
+                break;
+            }
+        }
+    }
+
+    private void saveHubIcon(Uri uri) throws java.io.IOException {
+        android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
+        options.inJustDecodeBounds = true;
+        try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+            android.graphics.BitmapFactory.decodeStream(input, null, options);
+        }
+        int longest = Math.max(options.outWidth, options.outHeight);
+        if (longest <= 0) throw new java.io.IOException("Invalid image");
+        options.inJustDecodeBounds = false;
+        options.inSampleSize = Math.max(1, Integer.highestOneBit(longest / 256));
+        Bitmap image;
+        try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+            image = android.graphics.BitmapFactory.decodeStream(input, null, options);
+        }
+        if (image == null) throw new java.io.IOException("Invalid image");
+        android.util.AtomicFile file = new android.util.AtomicFile(new java.io.File(getFilesDir(), "hub-icon.png"));
+        java.io.FileOutputStream output = file.startWrite();
+        try {
+            if (!image.compress(Bitmap.CompressFormat.PNG, 100, output)) throw new java.io.IOException("Image encoding failed");
+            file.finishWrite(output);
+        } catch (java.io.IOException | RuntimeException ex) {
+            file.failWrite(output);
+            throw ex;
+        } finally {
+            image.recycle();
+        }
+    }
+
     private void showSettings() {
         String[] actions = {"اختيار أحد التطبيقات الأربعة", "تعديل الرابط والاسم وحجم الخط", "اختيار صورة للاختصار",
-                "إضافة اختصار بالاسم والصورة", "تجربة منبّه طويل", "إذن التنبيه الدقيق"};
+                "إضافة اختصار بالاسم والصورة", "تجربة منبّه طويل", "إذن التنبيه الدقيق", "أيقونة تطبيقات سلوم"};
         int preset = getResources().getInteger(R.integer.launch_preset);
         if (preset >= 0) {
             new AlertDialog.Builder(this).setTitle("الإعدادات").setItems(
@@ -477,6 +551,7 @@ public final class MainActivity extends Activity {
                 case 2 -> startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), 24);
                 case 3 -> pinShortcut();
                 case 4 -> showTestAlarm();
+                case 6 -> showHubIconSettings();
                 case 5 -> {
                     if (Build.VERSION.SDK_INT >= 31)
                         startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getPackageName())));
@@ -639,6 +714,13 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == 27 && result == RESULT_OK && data != null && data.getData() != null) {
+            try {
+                saveHubIcon(data.getData());
+                refreshHubIcon();
+                toast("تم حفظ الأيقونة.");
+            } catch (java.io.IOException | RuntimeException ex) { toast("تعذّر حفظ صورة الأيقونة."); }
+        }
         if (request == 26 && result == RESULT_OK && data != null && testToneButton != null) {
             Uri selected = data.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
             if (selected != null) {

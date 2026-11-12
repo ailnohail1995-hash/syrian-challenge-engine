@@ -50,7 +50,7 @@ with wave.open(sys.argv[1], "wb") as tone:
 PYTONE
 "$tools/aapt2" compile --dir "$out/res" -o "$out/resources.zip"
 "$tools/aapt2" link -I "$android" --manifest "$out/AndroidManifest.xml" --java "$out/generated" \
-  --rename-manifest-package "$package" --version-code 5 --version-name 0.5 -o "$out/unsigned.apk" "$out/resources.zip"
+  --rename-manifest-package "$package" --version-code 6 --version-name 0.6 -o "$out/unsigned.apk" "$out/resources.zip"
 mapfile -t sources < <(find src "$out/generated" -name '*.java' -type f)
 javac --release 17 -classpath "$android" -d "$out/classes" "${sources[@]}"
 jar cf "$out/classes.jar" -C "$out/classes" .
