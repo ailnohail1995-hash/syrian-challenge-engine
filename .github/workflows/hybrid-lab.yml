@@ -58,7 +58,10 @@ jobs:
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
           adb shell pm grant dev.hybridlab android.permission.POST_NOTIFICATIONS
-          adb shell appops set dev.hybridlab SCHEDULE_EXACT_ALARM allow
+          adb shell cmd appops set --uid dev.hybridlab SCHEDULE_EXACT_ALARM allow
+          adb shell cmd appops get --uid dev.hybridlab SCHEDULE_EXACT_ALARM
+          adb shell am force-stop dev.hybridlab
+          adb shell am start -W -n dev.hybridlab/.MainActivity
           adb shell settings put global stay_on_while_plugged_in 0
           timeout 90 adb shell am instrument -w -e mode alarm dev.hybridlab/.LabSmoke | tee "$RUNNER_TEMP/hybrid-smoke.txt"
           adb logcat -d -s HybridTestAlarm AndroidRuntime
