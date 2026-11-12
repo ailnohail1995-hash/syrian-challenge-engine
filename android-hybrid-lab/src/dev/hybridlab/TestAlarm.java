@@ -26,6 +26,10 @@ final class TestAlarm {
         manager.setAlarmClock(new AlarmManager.AlarmClockInfo(at, show), operation);
     }
 
+    static Uri fallback(Context context) {
+        return Uri.parse("android.resource://" + context.getPackageName() + "/" + R.raw.alarm_fallback);
+    }
+
     static Uri tone(Intent intent) {
         String value = intent.getStringExtra("tone");
         return value == null ? RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM) : Uri.parse(value);

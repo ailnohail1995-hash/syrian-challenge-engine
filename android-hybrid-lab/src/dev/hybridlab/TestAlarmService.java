@@ -36,7 +36,7 @@ public final class TestAlarmService extends Service {
         startForeground(NOTIFICATION, notification);
         handler.removeCallbacks(timeout);
         releasePlayer();
-        if (!play(TestAlarm.tone(intent))) play(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM));
+        if (!play(TestAlarm.tone(intent))) play(TestAlarm.fallback(this));
         handler.postDelayed(timeout, 5 * 60_000L);
         return START_NOT_STICKY;
     }

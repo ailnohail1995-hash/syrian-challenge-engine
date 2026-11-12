@@ -78,7 +78,7 @@ public final class LabSmoke extends Instrumentation {
         try {
             runOnMainSync(() -> {
                 TestAlarm.schedule(activity, at, "Alarm smoke test",
-                        android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM), 1);
+                        TestAlarm.fallback(activity), 1);
                 activity.moveTaskToBack(true);
             });
             try (var shell = getUiAutomation().executeShellCommand("input keyevent KEYCODE_SLEEP");

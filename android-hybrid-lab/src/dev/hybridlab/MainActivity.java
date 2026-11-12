@@ -442,14 +442,15 @@ public final class MainActivity extends Activity {
                 android.text.format.DateFormat.is24HourFormat(this)).show();
         });
         form.addView(time);
-        testTone = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM);
+        testTone = TestAlarm.fallback(this);
         testToneButton = new Button(this);
-        testToneButton.setText("النغمة الافتراضية • تغيير");
+        testToneButton.setText("نغمة المختبر • تغيير");
         testToneButton.setOnClickListener(view -> {
             Intent picker = new Intent(android.media.RingtoneManager.ACTION_RINGTONE_PICKER)
                     .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_ALARM)
                     .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
-                    .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, testTone);
+                    .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                            "android.resource".equals(testTone.getScheme()) ? android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM) : testTone);
             try { startActivityForResult(picker, 26); }
             catch (ActivityNotFoundException ex) { toast("منتقي النغمات غير متاح على هذا الجهاز."); }
         });
