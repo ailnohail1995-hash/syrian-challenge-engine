@@ -8,7 +8,7 @@ out="${BUILD_DIR:-$PWD/build}"
 mkdir -p "$out"/{generated,classes,dex}
 "$tools/aapt2" compile --dir res -o "$out/resources.zip"
 "$tools/aapt2" link -I "$android" --manifest AndroidManifest.xml --java "$out/generated" \
-  --version-code 1 --version-name 0.1 -o "$out/unsigned.apk" "$out/resources.zip"
+  --version-code 2 --version-name 0.2 -o "$out/unsigned.apk" "$out/resources.zip"
 mapfile -t sources < <(find src "$out/generated" -name '*.java' -type f)
 javac --release 17 -classpath "$android" -d "$out/classes" "${sources[@]}"
 jar cf "$out/classes.jar" -C "$out/classes" .

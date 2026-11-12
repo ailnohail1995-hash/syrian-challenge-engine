@@ -36,22 +36,189 @@ public final class MainActivity extends Activity {
     private PermissionRequest camera;
     private Bitmap shortcutImage;
     private long touchStart = -1;
+    private ScrollView home;
+    private LinearLayout homeCards;
+    private LinearLayout browser;
+    private TextView title;
+    private Button imagePicker;
+    private Bitmap draftImage;
+    private boolean loadingFailed;
+    private String loadedUrl;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         settings = getSharedPreferences("lab", MODE_PRIVATE);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(0, dp(28), 0, dp(28));
+        FrameLayout root = new FrameLayout(this);
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            view.setPadding(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            return insets;
+        });
+        root.setBackgroundColor(0xff081525);
+        home = new ScrollView(this);
+        home.setFillViewport(true);
+        root.addView(home, new FrameLayout.LayoutParams(-1, -1));
+        browser = new LinearLayout(this);
+        browser.setOrientation(LinearLayout.VERTICAL);
+        browser.setBackgroundColor(0xff081525);
+        root.addView(browser, new FrameLayout.LayoutParams(-1, -1));
+        LinearLayout bar = new LinearLayout(this);
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        Button back = new Button(this);
+        back.setText("التطبيقات");
+        back.setOnClickListener(view -> showHome());
+        bar.addView(back);
+        title = label("", 17, 0xffeff7ff, true);
+        title.setGravity(Gravity.CENTER);
+        title.setSingleLine();
+        title.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        bar.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
         Button options = new Button(this);
-        options.setText("إعدادات التطبيق");
+        options.setText("الإعدادات");
         options.setOnClickListener(view -> showSettings());
-        root.addView(options);
+        bar.addView(options);
+        browser.addView(bar);
         web = new WebView(this);
-        root.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
+        browser.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
         configureWebView();
-        open(settings.getString("url", SITES[0]));
+        showHome();
+    }
+
+    private void showHome() {
+        browser.setVisibility(View.GONE);
+        home.setVisibility(View.VISIBLE);
+        home.removeAllViews();
+        FrameLayout centered = new FrameLayout(this);
+        home.addView(centered, new ScrollView.LayoutParams(-1, -2));
+        homeCards = new LinearLayout(this);
+        homeCards.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        homeCards.setOrientation(LinearLayout.VERTICAL);
+        homeCards.setPadding(dp(20), dp(26), dp(20), dp(26));
+        int width = Math.min(getResources().getDisplayMetrics().widthPixels, dp(580));
+        centered.addView(homeCards, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER_HORIZONTAL));
+        ImageView brand = new ImageView(this);
+        brand.setImageResource(R.drawable.lab_icon);
+        LinearLayout.LayoutParams brandSize = new LinearLayout.LayoutParams(dp(66), dp(66));
+        brandSize.bottomMargin = dp(12);
+        homeCards.addView(brand, brandSize);
+        homeCards.addView(label("مختبر التطبيقات", 28, 0xfff2f8ff, true));
+        TextView intro = label("اختر تطبيقًا لفتحه مباشرةً", 16, 0xffaabed2, false);
+        intro.setPadding(0, dp(6), 0, dp(18));
+        homeCards.addView(intro);
+        for (int i = 0; i < SITES.length; i++) {
+            final int selected = i;
+            homeCards.addView(card(NAMES[i], Uri.parse(SITES[i]).getHost(), null, i,
+                    () -> saveAndOpen(SITES[selected], NAMES[selected], settings.getInt("zoom", 100))));
+        }
+        String custom = settings.getString("custom_url", "");
+        if (!custom.isEmpty()) {
+            String name = settings.getString("custom_name", "تطبيقي");
+            homeCards.addView(card(name, Uri.parse(custom).getHost(), customIcon(), 4,
+                    () -> saveAndOpen(custom, name, settings.getInt("zoom", 100))));
+        }
+        Button add = new Button(this);
+        add.setText(custom.isEmpty() ? "إضافة تطبيق" : "تعديل التطبيق المضاف");
+        add.setOnClickListener(view -> editCustom());
+        homeCards.addView(add);
+    }
+
+    private View card(String name, String host, Bitmap image, int index, Runnable action) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(14), dp(11), dp(14), dp(11));
+        row.setBackground(background(0xff162b41, 15));
+        row.setFocusable(true);
+        row.setContentDescription(name);
+        row.setOnClickListener(view -> action.run());
+        LinearLayout.LayoutParams rowSize = new LinearLayout.LayoutParams(-1, -2);
+        rowSize.bottomMargin = dp(9);
+        row.setLayoutParams(rowSize);
+        ImageView icon = new ImageView(this);
+        if (image != null) icon.setImageBitmap(image);
+        else icon.setImageResource(index < 2 ? R.drawable.dulja_card : index < 4 ? R.drawable.toqna_card : R.drawable.lab_icon);
+        icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        icon.setBackground(background(0xff233b51, 11));
+        icon.setClipToOutline(true);
+        row.addView(icon, new LinearLayout.LayoutParams(dp(46), dp(46)));
+        LinearLayout lines = new LinearLayout(this);
+        lines.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams lineSize = new LinearLayout.LayoutParams(0, -2, 1);
+        lineSize.setMarginStart(dp(12));
+        row.addView(lines, lineSize);
+        lines.addView(label(name, 17, 0xfff2f8ff, true));
+        TextView domain = label(host, 12, 0xffb1c5d8, false);
+        domain.setTextDirection(View.TEXT_DIRECTION_LTR);
+        lines.addView(domain);
+        row.addView(label("‹", 22, 0xff6be5c5, true));
+        return row;
+    }
+
+    private TextView label(String value, int size, int color, boolean bold) {
+        TextView label = new TextView(this);
+        label.setText(value);
+        label.setTextSize(size);
+        label.setTextColor(color);
+        if (bold) label.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        return label;
+    }
+
+    private android.graphics.drawable.GradientDrawable background(int color, int radius) {
+        android.graphics.drawable.GradientDrawable drawable = new android.graphics.drawable.GradientDrawable();
+        drawable.setColor(color);
+        drawable.setCornerRadius(dp(radius));
+        return drawable;
+    }
+
+    private Bitmap customIcon() {
+        return android.graphics.BitmapFactory.decodeFile(new java.io.File(getFilesDir(), "custom-icon.png").getPath());
+    }
+
+    private void editCustom() {
+        draftImage = customIcon();
+        LinearLayout fields = new LinearLayout(this);
+        fields.setOrientation(LinearLayout.VERTICAL);
+        fields.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
+        fields.setPadding(dp(20), 0, dp(20), 0);
+        EditText name = new EditText(this);
+        name.setHint("اسم التطبيق");
+        name.setSingleLine();
+        name.setText(settings.getString("custom_name", ""));
+        EditText url = new EditText(this);
+        url.setHint("https://example.com");
+        url.setTextDirection(View.TEXT_DIRECTION_LTR);
+        url.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
+        url.setSingleLine();
+        url.setText(settings.getString("custom_url", ""));
+        imagePicker = new Button(this);
+        imagePicker.setText(draftImage == null ? "اختر صورة الأيقونة" : "غيّر صورة الأيقونة");
+        imagePicker.setOnClickListener(view -> {
+            Intent picker = new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE);
+            try { startActivityForResult(picker, 25); }
+            catch (ActivityNotFoundException ex) { toast("لا يوجد تطبيق لاختيار الصور."); }
+        });
+        fields.addView(name);
+        fields.addView(url);
+        fields.addView(imagePicker);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("إضافة تطبيق")
+                .setView(fields).setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null).create();
+        dialog.setOnDismissListener(ignored -> { imagePicker = null; draftImage = null; });
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            String link = url.getText().toString().trim();
+            String appName = limit(name.getText().toString().trim(), 35);
+            if (appName.isEmpty()) { name.setError("أدخل اسم التطبيق"); return; }
+            if (link.length() > 2048 || origin(Uri.parse(link)) == null) { url.setError("أدخل رابط HTTPS صالحًا"); return; }
+            if (draftImage != null) {
+                try (java.io.OutputStream output = openFileOutput("custom-icon.png", MODE_PRIVATE)) {
+                    if (!draftImage.compress(Bitmap.CompressFormat.PNG, 100, output)) throw new java.io.IOException();
+                } catch (java.io.IOException ex) { toast("تعذر حفظ صورة الأيقونة."); return; }
+            }
+            settings.edit().putString("custom_url", link).putString("custom_name", appName).apply();
+            dialog.dismiss();
+            showHome();
+        }));
+        dialog.show();
     }
 
     private void configureWebView() {
@@ -85,10 +252,21 @@ public final class MainActivity extends Activity {
             }
             @Override public void onPageStarted(WebView view, String url, Bitmap image) {
                 closeBridge();
+                loadingFailed = false;
+                loadedUrl = null;
+            }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame()) loadingFailed = true;
+            }
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (request.isForMainFrame()) loadingFailed = true;
             }
             @Override public void onPageFinished(WebView view, String url) {
                 if (!url.equals(view.getUrl())) return;
-                connectBridge(Uri.parse(url));
+                if (!loadingFailed) {
+                    loadedUrl = url;
+                    connectBridge(Uri.parse(url));
+                }
             }
         });
         web.setWebChromeClient(new WebChromeClient() {
@@ -272,7 +450,8 @@ public final class MainActivity extends Activity {
     private void pinShortcut() {
         ShortcutManager manager = getSystemService(ShortcutManager.class);
         if (!manager.isRequestPinShortcutSupported()) { toast("الشاشة الرئيسية لا تدعم إضافة اختصار من هنا."); return; }
-        Bitmap icon = shortcutImage;
+        String currentUrl = settings.getString("url", SITES[0]);
+        Bitmap icon = currentUrl.equals(settings.getString("custom_url", "")) ? customIcon() : shortcutImage;
         if (icon == null) icon = android.graphics.BitmapFactory.decodeFile(new java.io.File(getFilesDir(), "shortcut.png").getPath());
         Icon shortcutIcon = icon == null ? Icon.createWithResource(this, R.drawable.lab_icon) : Icon.createWithBitmap(icon);
         String url = settings.getString("url", SITES[0]);
@@ -301,6 +480,32 @@ public final class MainActivity extends Activity {
         if (request == 21 && files != null) {
             files.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
             files = null;
+        }
+        if (request == 25 && result == RESULT_OK && data != null && data.getData() != null && imagePicker != null) {
+            try {
+                Uri uri = data.getData();
+                if (Build.VERSION.SDK_INT >= 28) {
+                    draftImage = ImageDecoder.decodeBitmap(ImageDecoder.createSource(getContentResolver(), uri),
+                        (decoder, info, source) -> {
+                            int max = Math.max(info.getSize().getWidth(), info.getSize().getHeight());
+                            decoder.setTargetSampleSize(Math.max(1, (max + 255) / 256));
+                            decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE);
+                        });
+                } else {
+                    android.graphics.BitmapFactory.Options bounds = new android.graphics.BitmapFactory.Options();
+                    bounds.inJustDecodeBounds = true;
+                    try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+                        android.graphics.BitmapFactory.decodeStream(input, null, bounds);
+                    }
+                    bounds.inJustDecodeBounds = false;
+                    bounds.inSampleSize = Math.max(1, Integer.highestOneBit(Math.max(bounds.outWidth, bounds.outHeight) / 256));
+                    try (java.io.InputStream input = getContentResolver().openInputStream(uri)) {
+                        draftImage = android.graphics.BitmapFactory.decodeStream(input, null, bounds);
+                    }
+                }
+                if (draftImage == null) throw new java.io.IOException();
+                imagePicker.setText("تم اختيار الصورة • تغيير");
+            } catch (Exception ex) { toast("تعذر قراءة الصورة."); }
         }
         if (request == 24 && result == RESULT_OK && data != null && data.getData() != null) {
             try {
@@ -340,7 +545,13 @@ public final class MainActivity extends Activity {
         return "https://" + uri.getHost().toLowerCase(java.util.Locale.ROOT) + (port == -1 || port == 443 ? "" : ":" + port);
     }
 
-    private void open(String url) { if (origin(Uri.parse(url)) != null) web.loadUrl(url); }
+    private void open(String url) {
+        if (origin(Uri.parse(url)) == null) return;
+        home.setVisibility(View.GONE);
+        browser.setVisibility(View.VISIBLE);
+        title.setText(settings.getString("name", NAMES[0]));
+        web.loadUrl(url);
+    }
     private void openExternally(Uri uri) {
         try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
         catch (ActivityNotFoundException ex) { toast("تعذر فتح الرابط."); }
@@ -349,6 +560,8 @@ public final class MainActivity extends Activity {
     private static String limit(String text, int size) { return text.substring(0, Math.min(text.length(), size)); }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
-    @Override public void onBackPressed() { if (web.canGoBack()) web.goBack(); else super.onBackPressed(); }
+    @Override public void onBackPressed() { if (home.getVisibility() == View.VISIBLE) super.onBackPressed();
+        else if (web.canGoBack()) web.goBack();
+        else showHome(); }
     @Override protected void onDestroy() { closeBridge(); web.destroy(); super.onDestroy(); }
 }

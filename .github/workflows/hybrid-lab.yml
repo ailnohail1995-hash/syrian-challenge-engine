@@ -30,3 +30,32 @@ jobs:
           name: hybrid-lab-debug
           path: android-hybrid-lab/build/hybrid-lab-debug.apk
           if-no-files-found: error
+      - name: Test the four presets on an Android emulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          sdkmanager="$(find "${ANDROID_HOME:?}/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -n1)"
+          export PATH="$(dirname "$sdkmanager"):$ANDROID_HOME/platform-tools:$PATH"
+          image='system-images;android-35;google_apis;x86_64'
+          "$sdkmanager" "$image"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/android-user"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
+          printf 'no\n' | avdmanager create avd --name hybrid-lab --package "$image" --path "$ANDROID_AVD_HOME/hybrid-lab.avd"
+          adb start-server
+          "$ANDROID_HOME/emulator/emulator" -avd hybrid-lab -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          emulator=$!
+          trap 'if [ "$?" -ne 0 ]; then tail -n 50 "$RUNNER_TEMP/emulator.log"; fi; kill "$emulator" 2>/dev/null || true' EXIT
+          timeout 180 adb wait-for-device
+          for attempt in {1..45}; do
+            if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1 ]; then break; fi
+            sleep 4
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1
+          adb install android-hybrid-lab/build/hybrid-lab-debug.apk
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          timeout 240 adb shell am instrument -w dev.hybridlab/.LabSmoke | tee "$RUNNER_TEMP/hybrid-smoke.txt"
+          grep -F 'PASS: all four site cards loaded in WebView.' "$RUNNER_TEMP/hybrid-smoke.txt"
