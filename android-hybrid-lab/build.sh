@@ -5,7 +5,8 @@ sdk="${ANDROID_HOME:?Set ANDROID_HOME to the Android SDK}"
 tools="$sdk/build-tools/36.0.0"
 android="$sdk/platforms/android-36/android.jar"
 out="${BUILD_DIR:-$PWD/build}"
-mkdir -p "$out"/{generated,classes,dex}
+mkdir -p "$out"/{generated,classes,dex,assets}
+rm -f "$out/assets/apk-template.bin"
 rm -rf "$out/res"
 mkdir -p "$out/res/raw"
 cp -a res/. "$out/res/"
@@ -15,12 +16,16 @@ case "${APP_VARIANT:-hub}" in
   lovable) name='دلجة Lovable'; preset=1; package=dev.hybridlab.lovable; icon=dulja_card ;;
   toqna) name='TOQNA'; preset=2; package=dev.hybridlab.toqna; icon=toqna_card ;;
   heroes) name='أبطال TOQNA'; preset=3; package=dev.hybridlab.heroes; icon=toqna_card ;;
+  template) name=SalloumGeneratedLabel; preset=0; package=dev.salloum.template; icon=salloum_icon ;;
   *) echo "Unknown APP_VARIANT" >&2; exit 2 ;;
 esac
-if [[ "$preset" == -1 ]]; then
+if [[ "$preset" == -1 && "${LAB_INSTRUMENTATION:-0}" == 1 ]]; then
   sed 's|<!-- LAB_INSTRUMENTATION -->|<instrumentation android:name=".LabSmoke" android:targetPackage="dev.hybridlab" />|' AndroidManifest.xml > "$out/AndroidManifest.xml"
 else
   cp AndroidManifest.xml "$out/AndroidManifest.xml"
+fi
+if [[ "${APP_VARIANT:-hub}" == template ]]; then
+  sed -i 's|@string/launcher_name|SalloumGeneratedLabel|;s|@drawable/launcher_icon|@drawable/salloum_icon|' "$out/AndroidManifest.xml"
 fi
 mkdir -p "$out/res/values"
 cat > "$out/res/values/launcher.xml" <<RES
@@ -49,12 +54,20 @@ with wave.open(sys.argv[1], "wb") as tone:
     tone.writeframes(frames)
 PYTONE
 "$tools/aapt2" compile --dir "$out/res" -o "$out/resources.zip"
-"$tools/aapt2" link -I "$android" --manifest "$out/AndroidManifest.xml" --java "$out/generated" \
-  --rename-manifest-package "$package" --version-code 6 --version-name 0.6 -o "$out/unsigned.apk" "$out/resources.zip"
+if [[ "${APP_VARIANT:-hub}" == hub ]]; then
+  APP_VARIANT=template BUILD_DIR="$out/template" bash build.sh
+  cp "$out/template/aligned.apk" "$out/assets/apk-template.bin"
+fi
+debug=()
+if [[ "${LAB_INSTRUMENTATION:-0}" == 1 ]]; then debug+=(--debug-mode); fi
+"$tools/aapt2" link "${debug[@]}" -A "$out/assets" -I "$android" --manifest "$out/AndroidManifest.xml" --java "$out/generated" \
+  --rename-manifest-package "$package" --version-code 7 --version-name 0.7 -o "$out/unsigned.apk" "$out/resources.zip"
 mapfile -t sources < <(find src "$out/generated" -name '*.java' -type f)
-javac --release 17 -classpath "$android" -d "$out/classes" "${sources[@]}"
+javac --release 17 -classpath "$android:$tools/lib/apksigner.jar" -d "$out/classes" "${sources[@]}"
 jar cf "$out/classes.jar" -C "$out/classes" .
-"$tools/d8" --lib "$android" --min-api 26 --output "$out/dex" "$out/classes.jar"
+inputs=("$out/classes.jar")
+if [[ "${APP_VARIANT:-hub}" == hub ]]; then inputs+=("$tools/lib/apksigner.jar"); fi
+"$tools/d8" --lib "$android" --min-api 26 --output "$out/dex" "${inputs[@]}"
 (cd "$out/dex" && zip -q "$out/unsigned.apk" classes.dex)
 "$tools/zipalign" -f -p 4 "$out/unsigned.apk" "$out/aligned.apk"
 key="${HYBRID_LAB_DEBUG_KEYSTORE:-$HOME/.android/hybrid-lab-debug.jks}"

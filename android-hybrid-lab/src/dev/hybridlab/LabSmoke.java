@@ -10,8 +10,10 @@ import android.view.ViewGroup;
 
 public final class LabSmoke extends Instrumentation {
     private boolean alarmOnly;
+    private String factory;
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
+        factory = arguments == null ? null : arguments.getString("factory");
         alarmOnly = arguments != null && "alarm".equals(arguments.getString("mode"));
         start();
     }
@@ -21,6 +23,16 @@ public final class LabSmoke extends Instrumentation {
         try {
             Intent intent = new Intent(getTargetContext(), MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             Activity activity = startActivitySync(intent);
+            if (factory != null) {
+                android.graphics.Bitmap icon = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888);
+                icon.eraseColor("2".equals(factory) ? 0xfffcaf34 : 0xff24b9a4);
+                ApkFactory.build(activity, "dev.salloum.p0123456789abcdef0123",
+                        "2".equals(factory) ? "سلوم المحدّث" : "سلوم التجريبي", "https://toqna.pages.dev/", icon);
+                icon.recycle();
+                result.putString("stream", "FACTORY_OK");
+                finish(Activity.RESULT_OK, result);
+                return;
+            }
             if (alarmOnly) {
                 testAlarm(activity);
                 result.putString("stream", "\nPASS: test alarm started audio with screen off, snooze stopped audio and rescheduled.\n");

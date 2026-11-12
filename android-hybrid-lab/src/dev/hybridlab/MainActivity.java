@@ -102,7 +102,14 @@ public final class MainActivity extends Activity {
         if (preset < 0) showHome();
         else {
             back.setVisibility(View.GONE);
-            saveAndOpen(SITES[preset], NAMES[preset], settings.getInt("zoom", 100));
+            String url = SITES[preset];
+            String name = NAMES[preset];
+            try (java.io.InputStream config = getAssets().open("project.json")) {
+                JSONObject project = new JSONObject(new String(ApkFactory.read(config), java.nio.charset.StandardCharsets.UTF_8));
+                url = project.getString("url");
+                name = project.getString("name");
+            } catch (java.io.IOException | org.json.JSONException ignored) { }
+            saveAndOpen(url, name, settings.getInt("zoom", 100));
         }
     }
 
@@ -152,6 +159,10 @@ public final class MainActivity extends Activity {
         add.setText("＋ إضافة تطبيق");
         add.setOnClickListener(view -> editCustom(null));
         homeCards.addView(add);
+        Button export = new Button(this);
+        export.setText("إنشاء APK مستقل");
+        export.setOnClickListener(view -> showApkFactory());
+        homeCards.addView(export);
         Button settingsButton = new Button(this);
         settingsButton.setText("الإعدادات");
         settingsButton.setOnClickListener(view -> showSettings());
@@ -456,6 +467,75 @@ public final class MainActivity extends Activity {
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
     }
 
+    private void showApkFactory() {
+        org.json.JSONArray custom = customApps();
+        java.util.ArrayList<String> names = new java.util.ArrayList<>(java.util.Arrays.asList(NAMES));
+        java.util.ArrayList<String> links = new java.util.ArrayList<>(java.util.Arrays.asList(SITES));
+        for (int i = 0; i < custom.length(); i++) {
+            JSONObject entry = custom.optJSONObject(i);
+            if (entry != null) {
+                names.add(entry.optString("name"));
+                links.add(entry.optString("url"));
+            }
+        }
+        new AlertDialog.Builder(this).setTitle("اختر المشروع").setItems(names.toArray(new String[0]),
+                (dialog, index) -> configureApk(names.get(index), links.get(index))).show();
+    }
+
+    private void configureApk(String name, String url) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(8), dp(20), dp(8));
+        EditText label = new EditText(this);
+        label.setSingleLine(true);
+        label.setFilters(new android.text.InputFilter[]{new android.text.InputFilter.LengthFilter(40)});
+        label.setText(name);
+        form.addView(label);
+        draftImage = null;
+        imagePicker = new Button(this);
+        imagePicker.setText("اختيار صورة الأيقونة");
+        imagePicker.setOnClickListener(view -> {
+            try {
+                startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*")
+                        .addCategory(Intent.CATEGORY_OPENABLE), 25);
+            } catch (ActivityNotFoundException ex) { toast("اختيار الصور غير متاح."); }
+        });
+        form.addView(imagePicker);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("إنشاء أو تحديث APK").setView(form)
+                .setNegativeButton("إلغاء", null).setPositiveButton("بناء على الهاتف", null).create();
+        dialog.setOnDismissListener(ignored -> { imagePicker = null; draftImage = null; });
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            String selected = label.getText().toString().trim();
+            if (selected.isEmpty()) { label.setError("أدخل اسم التطبيق"); return; }
+            Bitmap icon = draftImage;
+            String id = "dev.salloum.p" + java.util.UUID.nameUUIDFromBytes(
+                    url.getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString().replace("-", "").substring(0, 20);
+            dialog.dismiss();
+            ProgressDialog building = ProgressDialog.show(this, "", "جارٍ بناء وتوقيع التطبيق…", true, false);
+            new Thread(() -> {
+                try {
+                    java.io.File apk = ApkFactory.build(this, id, selected, url, icon);
+                    runOnUiThread(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+                        building.dismiss();
+                        new AlertDialog.Builder(this).setTitle("تم إنشاء APK").setMessage(selected)
+                                .setPositiveButton("حفظ الملف", (d, button) -> {
+                                    settings.edit().putString("pending_apk_export", apk.getName()).apply();
+                                    startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                                            .setType("application/vnd.android.package-archive")
+                                            .addCategory(Intent.CATEGORY_OPENABLE)
+                                            .putExtra(Intent.EXTRA_TITLE, selected + ".apk"), 28);
+                                }).setNegativeButton("إغلاق", null).show();
+                    });
+                } catch (Exception ex) {
+                    android.util.Log.e("SalloumFactory", "APK generation failed", ex);
+                    runOnUiThread(() -> { if (!isDestroyed()) { building.dismiss(); toast("تعذّر بناء الحزمة."); } });
+                }
+            }).start();
+        }));
+        dialog.show();
+    }
+
     private Bitmap savedHubIcon() {
         return android.graphics.BitmapFactory.decodeFile(new java.io.File(getFilesDir(), "hub-icon.png").getPath());
     }
@@ -714,6 +794,20 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == 28 && result == RESULT_OK && data != null && data.getData() != null) {
+            String pending = settings.getString("pending_apk_export", "");
+            if (pending.matches("dev\\.salloum\\.p[a-f0-9]{20}\\.apk")) {
+                java.io.File apk = new java.io.File(new java.io.File(getFilesDir(), "exports"), pending);
+                try (java.io.InputStream input = new java.io.FileInputStream(apk);
+                     java.io.OutputStream output = getContentResolver().openOutputStream(data.getData(), "wt")) {
+                    if (output == null) throw new java.io.IOException("Export unavailable");
+                    byte[] buffer = new byte[8192];
+                    int count;
+                    while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
+                    toast("تم حفظ APK. افتحه من مدير الملفات للتثبيت.");
+                } catch (java.io.IOException ex) { toast("تعذّر حفظ APK."); }
+            }
+        }
         if (request == 27 && result == RESULT_OK && data != null && data.getData() != null) {
             try {
                 saveHubIcon(data.getData());

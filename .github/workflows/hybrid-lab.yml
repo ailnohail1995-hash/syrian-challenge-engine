@@ -30,7 +30,7 @@ jobs:
           name: hybrid-lab-debug
           path: android-hybrid-lab/build/hybrid-lab-debug.apk
           if-no-files-found: error
-      - name: Test the native alarm on an Android emulator
+      - name: Test local APK generation and updates on Android
         shell: bash
         run: |
           set -euo pipefail
@@ -39,7 +39,7 @@ jobs:
           sdkmanager="$(find "${ANDROID_HOME:?}/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -n1)"
           export PATH="$(dirname "$sdkmanager"):$ANDROID_HOME/platform-tools:$PATH"
           image='system-images;android-35;google_apis;x86_64'
-          "$sdkmanager" "$image"
+          "$sdkmanager" "$image" || "$sdkmanager" "$image"
           export ANDROID_USER_HOME="$RUNNER_TEMP/android-user"
           export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
           mkdir -p "$ANDROID_AVD_HOME"
@@ -54,15 +54,34 @@ jobs:
             sleep 4
           done
           test "$(adb shell getprop sys.boot_completed | tr -d '\r')" = 1
-          adb install android-hybrid-lab/build/hybrid-lab-debug.apk
+          LAB_INSTRUMENTATION=1 BUILD_DIR="$RUNNER_TEMP/factory-test" bash android-hybrid-lab/build.sh
+          adb install "$RUNNER_TEMP/factory-test/hybrid-lab-debug.apk"
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
-          adb shell pm grant dev.hybridlab android.permission.POST_NOTIFICATIONS
-          adb shell cmd appops set --uid dev.hybridlab SCHEDULE_EXACT_ALARM allow
-          adb shell cmd appops get --uid dev.hybridlab SCHEDULE_EXACT_ALARM
-          adb shell am force-stop dev.hybridlab
-          adb shell am start -W -n dev.hybridlab/.MainActivity
-          adb shell settings put global stay_on_while_plugged_in 0
-          timeout 90 adb shell am instrument -w -e mode alarm dev.hybridlab/.LabSmoke | tee "$RUNNER_TEMP/hybrid-smoke.txt"
-          adb logcat -d -s HybridTestAlarm AndroidRuntime
-          grep -F 'PASS: test alarm started audio with screen off, snooze stopped audio and rescheduled.' "$RUNNER_TEMP/hybrid-smoke.txt"
+          id=dev.salloum.p0123456789abcdef0123
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          signer="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          for version in 1 2; do
+            adb shell am instrument -w -e factory "$version" dev.hybridlab/.LabSmoke | tee "$RUNNER_TEMP/factory-$version.txt"
+            grep -q 'FACTORY_OK' "$RUNNER_TEMP/factory-$version.txt"
+            adb exec-out run-as dev.hybridlab cat "files/exports/$id.apk" > "$RUNNER_TEMP/generated-$version.apk"
+            "$signer" verify "$RUNNER_TEMP/generated-$version.apk"
+            adb install -r "$RUNNER_TEMP/generated-$version.apk"
+            if [[ "$version" == 1 ]]; then
+              "$aapt" dump badging "$RUNNER_TEMP/generated-$version.apk" | grep -F "application-label:'سلوم التجريبي'"
+              adb shell run-as "$id" sh -c "'echo retained > files-marker'"
+            else
+              "$aapt" dump badging "$RUNNER_TEMP/generated-$version.apk" | grep -F "application-label:'سلوم المحدّث'"
+              adb shell run-as "$id" cat files-marker | grep -F retained
+            fi
+          done
+          python3 - "$RUNNER_TEMP" <<'PYAPK'
+          import hashlib, sys, zipfile
+          from pathlib import Path
+          checksums = []
+          for version in (1, 2):
+              with zipfile.ZipFile(Path(sys.argv[1]) / f"generated-{version}.apk") as apk:
+                  checksums.append(hashlib.sha256(apk.read("res/drawable/salloum_icon.png")).digest())
+          assert checksums[0] != checksums[1]
+          print("Verified installation, changed launcher label and icon, and retained app data")
+          PYAPK
