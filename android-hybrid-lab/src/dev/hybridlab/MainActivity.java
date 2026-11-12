@@ -44,6 +44,7 @@ public final class MainActivity extends Activity {
     private Bitmap draftImage;
     private boolean loadingFailed;
     private String loadedUrl;
+    private String loadError;
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
@@ -254,12 +255,13 @@ public final class MainActivity extends Activity {
                 closeBridge();
                 loadingFailed = false;
                 loadedUrl = null;
+                loadError = null;
             }
             @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) loadingFailed = true;
+                if (request.isForMainFrame()) { loadingFailed = true; loadError = error.getErrorCode() + " " + error.getDescription(); }
             }
             @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
-                if (request.isForMainFrame()) loadingFailed = true;
+                if (request.isForMainFrame()) { loadingFailed = true; loadError = "HTTP " + response.getStatusCode(); }
             }
             @Override public void onPageFinished(WebView view, String url) {
                 if (!url.equals(view.getUrl())) return;

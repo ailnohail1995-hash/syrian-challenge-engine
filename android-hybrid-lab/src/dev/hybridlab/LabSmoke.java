@@ -21,6 +21,8 @@ public final class LabSmoke extends Instrumentation {
                 "toqna.pages.dev", "toqna-heroes-app.pages.dev"};
             var loaded = MainActivity.class.getDeclaredField("loadedUrl");
             loaded.setAccessible(true);
+            var error = MainActivity.class.getDeclaredField("loadError");
+            error.setAccessible(true);
             for (int i = 0; i < names.length; i++) {
                 runOnMainSync(() -> {
                     try {
@@ -38,11 +40,12 @@ public final class LabSmoke extends Instrumentation {
                 });
                 boolean ready = false;
                 for (int attempt = 0; attempt < 40; attempt++) {
-                    String[] url = new String[1];
+                    String[] url = new String[2];
                     runOnMainSync(() -> {
-                        try { url[0] = (String) loaded.get(activity); }
+                        try { url[0] = (String) loaded.get(activity); url[1] = (String) error.get(activity); }
                         catch (ReflectiveOperationException ex) { throw new IllegalStateException(ex); }
                     });
+                    if (url[1] != null) throw new IllegalStateException(host + ": " + url[1]);
                     if (url[0] != null && host.equals(android.net.Uri.parse(url[0]).getHost())) { ready = true; break; }
                     SystemClock.sleep(1000);
                 }
