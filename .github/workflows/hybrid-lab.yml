@@ -59,5 +59,7 @@ jobs:
           adb shell wm dismiss-keyguard
           adb shell pm grant dev.hybridlab android.permission.POST_NOTIFICATIONS
           adb shell appops set dev.hybridlab SCHEDULE_EXACT_ALARM allow
+          adb shell settings put global stay_on_while_plugged_in 0
           timeout 90 adb shell am instrument -w -e mode alarm dev.hybridlab/.LabSmoke | tee "$RUNNER_TEMP/hybrid-smoke.txt"
+          adb logcat -d -s HybridTestAlarm AndroidRuntime
           grep -F 'PASS: test alarm started audio with screen off, snooze stopped audio and rescheduled.' "$RUNNER_TEMP/hybrid-smoke.txt"

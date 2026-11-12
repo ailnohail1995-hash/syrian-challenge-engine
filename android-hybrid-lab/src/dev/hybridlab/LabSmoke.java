@@ -96,7 +96,7 @@ public final class LabSmoke extends Instrumentation {
                 }
                 SystemClock.sleep(1000);
             }
-            if (alarm == null || alarm.actions.length != 2) throw new IllegalStateException("No active audible alarm while screen off");
+            if (alarm == null || alarm.actions.length != 2) throw new IllegalStateException("No active audible alarm while screen off; interactive=" + activity.getSystemService(android.os.PowerManager.class).isInteractive() + ", audio=" + TestAlarmService.audioStarted + ", notifications=" + notifications.getActiveNotifications().length + ", next=" + alarms.getNextAlarmClock());
             alarm.actions[1].actionIntent.send();
             long deadline = SystemClock.elapsedRealtime() + 6000;
             while (SystemClock.elapsedRealtime() < deadline) {
