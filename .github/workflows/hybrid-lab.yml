@@ -45,7 +45,7 @@ jobs:
           mkdir -p "$ANDROID_AVD_HOME"
           printf 'no\n' | avdmanager create avd --name hybrid-lab --package "$image" --path "$ANDROID_AVD_HOME/hybrid-lab.avd"
           adb start-server
-          "$ANDROID_HOME/emulator/emulator" -avd hybrid-lab -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect -no-snapshot > "$RUNNER_TEMP/emulator.log" 2>&1 &
+          "$ANDROID_HOME/emulator/emulator" -avd hybrid-lab -no-window -no-audio -no-boot-anim -dns-server 8.8.8.8,1.1.1.1 -gpu swiftshader_indirect -no-snapshot > "$RUNNER_TEMP/emulator.log" 2>&1 &
           emulator=$!
           trap 'if [ "$?" -ne 0 ]; then tail -n 50 "$RUNNER_TEMP/emulator.log"; fi; kill "$emulator" 2>/dev/null || true' EXIT
           timeout 180 adb wait-for-device
