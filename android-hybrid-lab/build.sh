@@ -6,8 +6,30 @@ tools="$sdk/build-tools/36.0.0"
 android="$sdk/platforms/android-36/android.jar"
 out="${BUILD_DIR:-$PWD/build}"
 mkdir -p "$out"/{generated,classes,dex}
+rm -rf "$out/res"
 mkdir -p "$out/res/raw"
 cp -a res/. "$out/res/"
+case "${APP_VARIANT:-hub}" in
+  hub) name='تطبيقات سلوم'; preset=-1; package=dev.hybridlab; icon=salloum_icon ;;
+  dulja) name='دلجة العام'; preset=0; package=dev.hybridlab.dulja; icon=dulja_card ;;
+  lovable) name='دلجة Lovable'; preset=1; package=dev.hybridlab.lovable; icon=dulja_card ;;
+  toqna) name='TOQNA'; preset=2; package=dev.hybridlab.toqna; icon=toqna_card ;;
+  heroes) name='أبطال TOQNA'; preset=3; package=dev.hybridlab.heroes; icon=toqna_card ;;
+  *) echo "Unknown APP_VARIANT" >&2; exit 2 ;;
+esac
+if [[ "$preset" == -1 ]]; then
+  sed 's|<!-- LAB_INSTRUMENTATION -->|<instrumentation android:name=".LabSmoke" android:targetPackage="dev.hybridlab" />|' AndroidManifest.xml > "$out/AndroidManifest.xml"
+else
+  cp AndroidManifest.xml "$out/AndroidManifest.xml"
+fi
+mkdir -p "$out/res/values"
+cat > "$out/res/values/launcher.xml" <<RES
+<resources>
+  <string name="launcher_name">$name</string>
+  <integer name="launch_preset">$preset</integer>
+  <item name="launcher_icon" type="drawable">@drawable/$icon</item>
+</resources>
+RES
 python3 - "$out/res/raw/alarm_fallback.wav" <<'PYTONE'
 import math
 import struct
@@ -27,8 +49,8 @@ with wave.open(sys.argv[1], "wb") as tone:
     tone.writeframes(frames)
 PYTONE
 "$tools/aapt2" compile --dir "$out/res" -o "$out/resources.zip"
-"$tools/aapt2" link -I "$android" --manifest AndroidManifest.xml --java "$out/generated" \
-  --version-code 3 --version-name 0.3 -o "$out/unsigned.apk" "$out/resources.zip"
+"$tools/aapt2" link -I "$android" --manifest "$out/AndroidManifest.xml" --java "$out/generated" \
+  --rename-manifest-package "$package" --version-code 4 --version-name 0.4 -o "$out/unsigned.apk" "$out/resources.zip"
 mapfile -t sources < <(find src "$out/generated" -name '*.java' -type f)
 javac --release 17 -classpath "$android" -d "$out/classes" "${sources[@]}"
 jar cf "$out/classes.jar" -C "$out/classes" .

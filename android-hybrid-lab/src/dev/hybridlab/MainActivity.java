@@ -67,10 +67,13 @@ public final class MainActivity extends Activity {
         root.addView(browser, new FrameLayout.LayoutParams(-1, -1));
         LinearLayout bar = new LinearLayout(this);
         bar.setGravity(Gravity.CENTER_VERTICAL);
+        bar.setPadding(dp(10), dp(6), dp(10), dp(6));
         bar.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
         Button back = new Button(this);
         back.setText("التطبيقات");
         back.setOnClickListener(view -> showHome());
+        back.setTextColor(0xffd2f9ed);
+        back.setBackground(background(0xff19334a, 12));
         bar.addView(back);
         title = label("", 17, 0xffeff7ff, true);
         title.setGravity(Gravity.CENTER);
@@ -80,13 +83,20 @@ public final class MainActivity extends Activity {
         Button options = new Button(this);
         options.setText("الإعدادات");
         options.setOnClickListener(view -> showSettings());
+        options.setTextColor(0xffd2f9ed);
+        options.setBackground(background(0xff19334a, 12));
         bar.addView(options);
         browser.addView(bar);
         web = new WebView(this);
         browser.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
         configureWebView();
-        showHome();
+        int preset = getResources().getInteger(R.integer.launch_preset);
+        if (preset < 0) showHome();
+        else {
+            back.setVisibility(View.GONE);
+            saveAndOpen(SITES[preset], NAMES[preset], settings.getInt("zoom", 100));
+        }
     }
 
     private void showHome() {
@@ -102,11 +112,11 @@ public final class MainActivity extends Activity {
         int width = Math.min(getResources().getDisplayMetrics().widthPixels, dp(580));
         centered.addView(homeCards, new FrameLayout.LayoutParams(width, -2, Gravity.CENTER_HORIZONTAL));
         ImageView brand = new ImageView(this);
-        brand.setImageResource(R.drawable.lab_icon);
+        brand.setImageResource(R.drawable.salloum_icon);
         LinearLayout.LayoutParams brandSize = new LinearLayout.LayoutParams(dp(66), dp(66));
         brandSize.bottomMargin = dp(12);
         homeCards.addView(brand, brandSize);
-        homeCards.addView(label("مختبر التطبيقات", 28, 0xfff2f8ff, true));
+        homeCards.addView(label("تطبيقات سلوم", 28, 0xfff2f8ff, true));
         TextView intro = label("اختر تطبيقًا لفتحه مباشرةً", 16, 0xffaabed2, false);
         intro.setPadding(0, dp(6), 0, dp(18));
         homeCards.addView(intro);
@@ -115,15 +125,21 @@ public final class MainActivity extends Activity {
             homeCards.addView(card(NAMES[i], Uri.parse(SITES[i]).getHost(), null, i,
                     () -> saveAndOpen(SITES[selected], NAMES[selected], settings.getInt("zoom", 100))));
         }
-        String custom = settings.getString("custom_url", "");
-        if (!custom.isEmpty()) {
-            String name = settings.getString("custom_name", "تطبيقي");
-            homeCards.addView(card(name, Uri.parse(custom).getHost(), customIcon(), 4,
-                    () -> saveAndOpen(custom, name, settings.getInt("zoom", 100))));
+        org.json.JSONArray apps = customApps();
+        for (int i = 0; i < apps.length(); i++) {
+            JSONObject app = apps.optJSONObject(i);
+            if (app == null) continue;
+            String url = app.optString("url");
+            String name = app.optString("name");
+            String id = app.optString("id");
+            View entry = card(name, Uri.parse(url).getHost(), customIcon(id), 4,
+                    () -> saveAndOpen(url, name, settings.getInt("zoom", 100)));
+            entry.setOnLongClickListener(view -> { editCustom(app); return true; });
+            homeCards.addView(entry);
         }
         Button add = new Button(this);
-        add.setText(custom.isEmpty() ? "إضافة تطبيق" : "تعديل التطبيق المضاف");
-        add.setOnClickListener(view -> editCustom());
+        add.setText("＋ إضافة تطبيق");
+        add.setOnClickListener(view -> editCustom(null));
         homeCards.addView(add);
         Button settingsButton = new Button(this);
         settingsButton.setText("الإعدادات");
@@ -178,12 +194,29 @@ public final class MainActivity extends Activity {
         return drawable;
     }
 
-    private Bitmap customIcon() {
-        return android.graphics.BitmapFactory.decodeFile(new java.io.File(getFilesDir(), "custom-icon.png").getPath());
+    private org.json.JSONArray customApps() {
+        try {
+            String stored = settings.getString("custom_apps", null);
+            if (stored != null) return new org.json.JSONArray(stored);
+            org.json.JSONArray apps = new org.json.JSONArray();
+            String legacy = settings.getString("custom_url", "");
+            if (!legacy.isEmpty()) apps.put(new JSONObject().put("id", "legacy").put("url", legacy)
+                    .put("name", settings.getString("custom_name", "تطبيقي")));
+            return apps;
+        } catch (org.json.JSONException ex) { return new org.json.JSONArray(); }
     }
 
-    private void editCustom() {
-        draftImage = customIcon();
+    private String iconFile(String id) {
+        return "legacy".equals(id) ? "custom-icon.png" : "custom-icon-" + id + ".png";
+    }
+
+    private Bitmap customIcon(String id) {
+        return android.graphics.BitmapFactory.decodeFile(new java.io.File(getFilesDir(), iconFile(id)).getPath());
+    }
+
+    private void editCustom(JSONObject existing) {
+        String id = existing == null ? java.util.UUID.randomUUID().toString() : existing.optString("id");
+        draftImage = customIcon(id);
         LinearLayout fields = new LinearLayout(this);
         fields.setOrientation(LinearLayout.VERTICAL);
         fields.setLayoutDirection(View.LAYOUT_DIRECTION_RTL);
@@ -191,13 +224,13 @@ public final class MainActivity extends Activity {
         EditText name = new EditText(this);
         name.setHint("اسم التطبيق");
         name.setSingleLine();
-        name.setText(settings.getString("custom_name", ""));
+        name.setText(existing == null ? "" : existing.optString("name"));
         EditText url = new EditText(this);
         url.setHint("https://example.com");
         url.setTextDirection(View.TEXT_DIRECTION_LTR);
         url.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         url.setSingleLine();
-        url.setText(settings.getString("custom_url", ""));
+        url.setText(existing == null ? "" : existing.optString("url"));
         imagePicker = new Button(this);
         imagePicker.setText(draftImage == null ? "اختر صورة الأيقونة" : "غيّر صورة الأيقونة");
         imagePicker.setOnClickListener(view -> {
@@ -208,7 +241,7 @@ public final class MainActivity extends Activity {
         fields.addView(name);
         fields.addView(url);
         fields.addView(imagePicker);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("إضافة تطبيق")
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(existing == null ? "إضافة تطبيق" : "تعديل التطبيق")
                 .setView(fields).setNegativeButton("إلغاء", null).setPositiveButton("حفظ", null).create();
         dialog.setOnDismissListener(ignored -> { imagePicker = null; draftImage = null; });
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
@@ -217,11 +250,19 @@ public final class MainActivity extends Activity {
             if (appName.isEmpty()) { name.setError("أدخل اسم التطبيق"); return; }
             if (link.length() > 2048 || origin(Uri.parse(link)) == null) { url.setError("أدخل رابط HTTPS صالحًا"); return; }
             if (draftImage != null) {
-                try (java.io.OutputStream output = openFileOutput("custom-icon.png", MODE_PRIVATE)) {
+                try (java.io.OutputStream output = openFileOutput(iconFile(id), MODE_PRIVATE)) {
                     if (!draftImage.compress(Bitmap.CompressFormat.PNG, 100, output)) throw new java.io.IOException();
                 } catch (java.io.IOException ex) { toast("تعذر حفظ صورة الأيقونة."); return; }
             }
-            settings.edit().putString("custom_url", link).putString("custom_name", appName).apply();
+            org.json.JSONArray updated = new org.json.JSONArray();
+            org.json.JSONArray apps = customApps();
+            for (int i = 0; i < apps.length(); i++) {
+                JSONObject app = apps.optJSONObject(i);
+                if (app != null && !id.equals(app.optString("id"))) updated.put(app);
+            }
+            try { updated.put(new JSONObject().put("id", id).put("url", link).put("name", appName)); }
+            catch (org.json.JSONException ex) { toast("تعذر حفظ التطبيق."); return; }
+            settings.edit().putString("custom_apps", updated.toString()).apply();
             dialog.dismiss();
             showHome();
         }));
@@ -399,6 +440,20 @@ public final class MainActivity extends Activity {
     private void showSettings() {
         String[] actions = {"اختيار أحد التطبيقات الأربعة", "تعديل الرابط والاسم وحجم الخط", "اختيار صورة للاختصار",
                 "إضافة اختصار بالاسم والصورة", "تجربة منبّه طويل", "إذن التنبيه الدقيق"};
+        int preset = getResources().getInteger(R.integer.launch_preset);
+        if (preset >= 0) {
+            new AlertDialog.Builder(this).setTitle("الإعدادات").setItems(
+                    new String[]{"حجم الخط", "تجربة منبّه طويل"}, (dialog, item) -> {
+                        if (item == 1) showTestAlarm();
+                        else new AlertDialog.Builder(this).setTitle("حجم الخط").setItems(
+                            new String[]{"صغير", "عادي", "كبير", "كبير جدًا"}, (d, index) -> {
+                                int zoom = new int[]{85, 100, 120, 145}[index];
+                                settings.edit().putInt("zoom", zoom).apply();
+                                web.getSettings().setTextZoom(zoom);
+                            }).show();
+                    }).show();
+            return;
+        }
         new AlertDialog.Builder(this).setTitle("إعدادات التطبيق").setItems(actions, (dialog, item) -> {
             switch (item) {
                 case 0 -> new AlertDialog.Builder(this).setTitle(actions[0]).setItems(NAMES, (d, i) -> saveAndOpen(SITES[i], NAMES[i], settings.getInt("zoom", 100))).show();
@@ -526,7 +581,7 @@ public final class MainActivity extends Activity {
 
     private void saveAndOpen(String url, String name, int zoom) {
         String label = limit(name.trim(), 35);
-        if (label.isEmpty()) label = "مختبر التطبيقات";
+        if (label.isEmpty()) label = "تطبيقات سلوم";
         settings.edit().putString("url", url).putString("name", label).putInt("zoom", zoom).apply();
         web.getSettings().setTextZoom(zoom);
         open(url);
@@ -536,7 +591,13 @@ public final class MainActivity extends Activity {
         ShortcutManager manager = getSystemService(ShortcutManager.class);
         if (!manager.isRequestPinShortcutSupported()) { toast("الشاشة الرئيسية لا تدعم إضافة اختصار من هنا."); return; }
         String currentUrl = settings.getString("url", SITES[0]);
-        Bitmap icon = currentUrl.equals(settings.getString("custom_url", "")) ? customIcon() : shortcutImage;
+        Bitmap icon = null;
+        org.json.JSONArray apps = customApps();
+        for (int i = 0; i < apps.length(); i++) {
+            JSONObject app = apps.optJSONObject(i);
+            if (app != null && currentUrl.equals(app.optString("url"))) icon = customIcon(app.optString("id"));
+        }
+        if (icon == null) icon = shortcutImage;
         if (icon == null) icon = android.graphics.BitmapFactory.decodeFile(new java.io.File(getFilesDir(), "shortcut.png").getPath());
         Icon shortcutIcon = icon == null ? Icon.createWithResource(this, R.drawable.lab_icon) : Icon.createWithBitmap(icon);
         String url = settings.getString("url", SITES[0]);
@@ -655,6 +716,7 @@ public final class MainActivity extends Activity {
     private void toast(String message) { Toast.makeText(this, message, Toast.LENGTH_LONG).show(); }
     @Override public void onBackPressed() { if (home.getVisibility() == View.VISIBLE) super.onBackPressed();
         else if (web.canGoBack()) web.goBack();
-        else showHome(); }
+        else if (getResources().getInteger(R.integer.launch_preset) < 0) showHome();
+        else super.onBackPressed(); }
     @Override protected void onDestroy() { closeBridge(); web.destroy(); super.onDestroy(); }
 }
