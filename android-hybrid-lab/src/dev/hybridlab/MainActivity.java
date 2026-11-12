@@ -42,6 +42,8 @@ public final class MainActivity extends Activity {
     private TextView title;
     private Button imagePicker;
     private Bitmap draftImage;
+    private Uri testTone;
+    private Button testToneButton;
     private boolean loadingFailed;
     private String loadedUrl;
     private String loadError;
@@ -123,6 +125,10 @@ public final class MainActivity extends Activity {
         add.setText(custom.isEmpty() ? "إضافة تطبيق" : "تعديل التطبيق المضاف");
         add.setOnClickListener(view -> editCustom());
         homeCards.addView(add);
+        Button settingsButton = new Button(this);
+        settingsButton.setText("الإعدادات");
+        settingsButton.setOnClickListener(view -> showSettings());
+        homeCards.addView(settingsButton);
     }
 
     private View card(String name, String host, Bitmap image, int index, Runnable action) {
@@ -392,23 +398,99 @@ public final class MainActivity extends Activity {
 
     private void showSettings() {
         String[] actions = {"اختيار أحد التطبيقات الأربعة", "تعديل الرابط والاسم وحجم الخط", "اختيار صورة للاختصار",
-                "إضافة اختصار بالاسم والصورة", "اختبار تنبيه بعد 30 ثانية", "إذن التنبيه الدقيق"};
+                "إضافة اختصار بالاسم والصورة", "تجربة منبّه طويل", "إذن التنبيه الدقيق"};
         new AlertDialog.Builder(this).setTitle("إعدادات التطبيق").setItems(actions, (dialog, item) -> {
             switch (item) {
                 case 0 -> new AlertDialog.Builder(this).setTitle(actions[0]).setItems(NAMES, (d, i) -> saveAndOpen(SITES[i], NAMES[i], settings.getInt("zoom", 100))).show();
                 case 1 -> editSettings();
                 case 2 -> startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("image/*").addCategory(Intent.CATEGORY_OPENABLE), 24);
                 case 3 -> pinShortcut();
-                case 4 -> {
-                    try { schedule(417, System.currentTimeMillis() + 30_000, "مختبر التطبيقات", "تنبيه محلي مجدول"); toast("تمت الجدولة. اقفل الشاشة للاختبار."); }
-                    catch (IllegalArgumentException ex) { toast("اسمح بالإشعارات والتنبيه الدقيق ثم أعد المحاولة."); }
-                }
+                case 4 -> showTestAlarm();
                 case 5 -> {
                     if (Build.VERSION.SDK_INT >= 31)
                         startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getPackageName())));
                 }
             }
         }).show();
+    }
+
+    private void showTestAlarm() {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        form.setPadding(dp(20), dp(8), dp(20), dp(8));
+        Spinner event = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, TestAlarm.EVENTS);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        event.setAdapter(adapter);
+        form.addView(event);
+        final long[] at = {System.currentTimeMillis() + 30_000L};
+        Button time = new Button(this);
+        time.setText("بعد 30 ثانية");
+        time.setOnClickListener(view -> {
+            java.util.Calendar now = java.util.Calendar.getInstance();
+            new TimePickerDialog(this, (picker, hour, minute) -> {
+                java.util.Calendar selected = java.util.Calendar.getInstance();
+                selected.set(java.util.Calendar.HOUR_OF_DAY, hour);
+                selected.set(java.util.Calendar.MINUTE, minute);
+                selected.set(java.util.Calendar.SECOND, 0);
+                selected.set(java.util.Calendar.MILLISECOND, 0);
+                if (selected.getTimeInMillis() <= System.currentTimeMillis()) selected.add(java.util.Calendar.DATE, 1);
+                at[0] = selected.getTimeInMillis();
+                time.setText(android.text.format.DateFormat.getDateFormat(this).format(selected.getTime()) + " • " +
+                        android.text.format.DateFormat.getTimeFormat(this).format(selected.getTime()));
+            }, now.get(java.util.Calendar.HOUR_OF_DAY), now.get(java.util.Calendar.MINUTE),
+                android.text.format.DateFormat.is24HourFormat(this)).show();
+        });
+        form.addView(time);
+        testTone = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM);
+        testToneButton = new Button(this);
+        testToneButton.setText("النغمة الافتراضية • تغيير");
+        testToneButton.setOnClickListener(view -> {
+            Intent picker = new Intent(android.media.RingtoneManager.ACTION_RINGTONE_PICKER)
+                    .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_TYPE, android.media.RingtoneManager.TYPE_ALARM)
+                    .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, false)
+                    .putExtra(android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, testTone);
+            try { startActivityForResult(picker, 26); }
+            catch (ActivityNotFoundException ex) { toast("منتقي النغمات غير متاح على هذا الجهاز."); }
+        });
+        form.addView(testToneButton);
+        EditText snooze = new EditText(this);
+        snooze.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+        snooze.setHint("مدة الغفوة بالدقائق");
+        snooze.setText("5");
+        form.addView(snooze);
+        ScrollView scroll = new ScrollView(this);
+        scroll.addView(form);
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("تجربة منبّه تُقنى").setView(scroll)
+                .setNegativeButton("إغلاق", null)
+                .setNeutralButton("إلغاء المنبّه", (d, which) -> { TestAlarm.cancel(this); toast("تم إلغاء المنبّه التجريبي."); })
+                .setPositiveButton("جدولة", null).create();
+        dialog.setOnDismissListener(ignored -> testToneButton = null);
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+            if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 23);
+                return;
+            }
+            if (!getSystemService(NotificationManager.class).areNotificationsEnabled()) {
+                toast("فعّل إشعارات التطبيق أولًا."); return;
+            }
+            int minutes;
+            try { minutes = Integer.parseInt(snooze.getText().toString()); }
+            catch (NumberFormatException ex) { minutes = 0; }
+            if (minutes < 1 || minutes > 30) { snooze.setError("اختر من دقيقة إلى 30 دقيقة"); return; }
+            long selectedTime = "بعد 30 ثانية".contentEquals(time.getText()) ? System.currentTimeMillis() + 30_000L : at[0];
+            if (selectedTime <= System.currentTimeMillis()) { toast("اختر وقتًا جديدًا."); return; }
+            if (testTone == null) { toast("لم تتوفر نغمة منبّه على هذا الجهاز."); return; }
+            try {
+                TestAlarm.schedule(this, selectedTime, event.getSelectedItem().toString(), testTone, minutes);
+                dialog.dismiss();
+                toast("تمت الجدولة. يمكنك الخروج من التطبيق وقفل الشاشة.");
+            } catch (SecurityException ex) {
+                if (Build.VERSION.SDK_INT >= 31)
+                    startActivity(new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getPackageName())));
+            }
+        }));
+        dialog.show();
     }
 
     private void editSettings() {
@@ -479,6 +561,14 @@ public final class MainActivity extends Activity {
 
     @Override protected void onActivityResult(int request, int result, Intent data) {
         super.onActivityResult(request, result, data);
+        if (request == 26 && result == RESULT_OK && data != null && testToneButton != null) {
+            Uri selected = data.getParcelableExtra(android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+            if (selected != null) {
+                testTone = selected;
+                android.media.Ringtone ringtone = android.media.RingtoneManager.getRingtone(this, selected);
+                testToneButton.setText(ringtone == null ? "تم اختيار النغمة" : ringtone.getTitle(this));
+            }
+        }
         if (request == 21 && files != null) {
             files.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result, data));
             files = null;

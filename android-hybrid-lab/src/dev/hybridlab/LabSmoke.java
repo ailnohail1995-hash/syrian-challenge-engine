@@ -52,11 +52,51 @@ public final class LabSmoke extends Instrumentation {
                 if (!ready) throw new IllegalStateException("WebView did not finish loading " + host);
                 result.putString("site_" + i, host + " loaded");
             }
-            result.putString("stream", "\nPASS: all four site cards loaded in WebView.\n");
+            testAlarm(activity);
+            result.putString("stream", "\nPASS: all four site cards loaded in WebView.\nPASS: test alarm started audio with screen off, snooze stopped audio and rescheduled.\n");
             finish(Activity.RESULT_OK, result);
         } catch (Exception ex) {
             result.putString("stream", "\nFAIL: " + ex + "\n");
             finish(Activity.RESULT_CANCELED, result);
+        }
+    }
+
+    private void testAlarm(Activity activity) throws Exception {
+        android.app.NotificationManager notifications = activity.getSystemService(android.app.NotificationManager.class);
+        android.app.AlarmManager alarms = activity.getSystemService(android.app.AlarmManager.class);
+        long at = System.currentTimeMillis() + 6_000L;
+        try {
+            runOnMainSync(() -> {
+                TestAlarm.schedule(activity, at, "Alarm smoke test",
+                        android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_ALARM), 1);
+                activity.moveTaskToBack(true);
+            });
+            try (var shell = getUiAutomation().executeShellCommand("input keyevent KEYCODE_SLEEP");
+                 var output = new android.os.ParcelFileDescriptor.AutoCloseInputStream(shell)) {
+                while (output.read() != -1) { }
+            }
+            android.app.Notification alarm = null;
+            for (int attempt = 0; attempt < 24; attempt++) {
+                var power = activity.getSystemService(android.os.PowerManager.class);
+                if (!power.isInteractive() && TestAlarmService.audioStarted) {
+                    for (var item : notifications.getActiveNotifications()) {
+                        if (item.getId() == TestAlarmService.NOTIFICATION) alarm = item.getNotification();
+                    }
+                    if (alarm != null) break;
+                }
+                SystemClock.sleep(1000);
+            }
+            if (alarm == null || alarm.actions.length != 2) throw new IllegalStateException("No active audible alarm while screen off");
+            alarm.actions[1].actionIntent.send();
+            long deadline = SystemClock.elapsedRealtime() + 6000;
+            while (SystemClock.elapsedRealtime() < deadline) {
+                var next = alarms.getNextAlarmClock();
+                if (!TestAlarmService.audioStarted && next != null && next.getTriggerTime() > at + 30_000L) return;
+                SystemClock.sleep(250);
+            }
+            throw new IllegalStateException("Snooze did not stop audio and reschedule");
+        } finally {
+            runOnMainSync(() -> TestAlarm.cancel(activity));
         }
     }
 

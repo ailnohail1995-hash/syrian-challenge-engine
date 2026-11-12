@@ -57,5 +57,7 @@ jobs:
           adb install android-hybrid-lab/build/hybrid-lab-debug.apk
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
-          timeout 240 adb shell am instrument -w dev.hybridlab/.LabSmoke | tee "$RUNNER_TEMP/hybrid-smoke.txt"
+          adb shell pm grant dev.hybridlab android.permission.POST_NOTIFICATIONS
+          adb shell appops set dev.hybridlab SCHEDULE_EXACT_ALARM allow
+          timeout 260 adb shell am instrument -w dev.hybridlab/.LabSmoke | tee "$RUNNER_TEMP/hybrid-smoke.txt"
           grep -F 'PASS: all four site cards loaded in WebView.' "$RUNNER_TEMP/hybrid-smoke.txt"
