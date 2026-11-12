@@ -36,6 +36,9 @@ public final class MainActivity extends Activity {
     private PermissionRequest camera;
     private Bitmap shortcutImage;
     private long touchStart = -1;
+    private FrameLayout webStage;
+    private LinearLayout opening;
+    private int openingSequence;
     private ScrollView home;
     private LinearLayout homeCards;
     private LinearLayout browser;
@@ -88,7 +91,11 @@ public final class MainActivity extends Activity {
         bar.addView(options);
         browser.addView(bar);
         web = new WebView(this);
-        browser.addView(web, new LinearLayout.LayoutParams(-1, 0, 1));
+        webStage = new FrameLayout(this);
+        webStage.setBackgroundColor(0xff081525);
+        web.setBackgroundColor(0xff081525);
+        webStage.addView(web, new FrameLayout.LayoutParams(-1, -1));
+        browser.addView(webStage, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
         configureWebView();
         int preset = getResources().getInteger(R.integer.launch_preset);
@@ -100,6 +107,7 @@ public final class MainActivity extends Activity {
     }
 
     private void showHome() {
+        clearOpening();
         browser.setVisibility(View.GONE);
         home.setVisibility(View.VISIBLE);
         home.removeAllViews();
@@ -315,6 +323,14 @@ public final class MainActivity extends Activity {
                 if (!loadingFailed) {
                     loadedUrl = url;
                     connectBridge(Uri.parse(url));
+                    int sequence = openingSequence;
+                    view.postVisualStateCallback(sequence, new WebView.VisualStateCallback() {
+                        @Override public void onComplete(long requestId) {
+                            if (requestId == openingSequence && url.equals(loadedUrl)) clearOpening();
+                        }
+                    });
+                } else if (opening != null) {
+                    showOpeningError();
                 }
             }
         });
@@ -704,7 +720,67 @@ public final class MainActivity extends Activity {
         home.setVisibility(View.GONE);
         browser.setVisibility(View.VISIBLE);
         title.setText(settings.getString("name", NAMES[0]));
+        showOpening(url);
         web.loadUrl(url);
+    }
+
+    private void showOpening(String url) {
+        clearOpening();
+        int sequence = openingSequence;
+        int preset = java.util.Arrays.asList(SITES).indexOf(url);
+        opening = new LinearLayout(this);
+        opening.setOrientation(LinearLayout.VERTICAL);
+        opening.setGravity(Gravity.CENTER);
+        opening.setBackgroundColor(preset == 0 ? 0xff092820 : preset == 1 ? 0xff15231c :
+                preset == 2 ? 0xff102944 : preset == 3 ? 0xff231b3f : 0xff081525);
+        opening.setClickable(true);
+        ImageView mark = new ImageView(this);
+        mark.setImageResource(preset == 0 || preset == 1 ? R.drawable.dulja_card :
+                preset == 2 || preset == 3 ? R.drawable.toqna_card : R.drawable.salloum_icon);
+        org.json.JSONArray apps = customApps();
+        for (int i = 0; i < apps.length(); i++) {
+            JSONObject app = apps.optJSONObject(i);
+            if (app != null && url.equals(app.optString("url"))) {
+                Bitmap icon = customIcon(app.optString("id"));
+                if (icon != null) mark.setImageBitmap(icon);
+                break;
+            }
+        }
+        mark.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        opening.addView(mark, new LinearLayout.LayoutParams(dp(92), dp(92)));
+        TextView name = label(title.getText().toString(), 24, 0xfff2f8ff, true);
+        name.setPadding(dp(12), dp(16), dp(12), dp(12));
+        name.setGravity(Gravity.CENTER);
+        opening.addView(name);
+        ProgressBar progress = new ProgressBar(this);
+        opening.addView(progress, new LinearLayout.LayoutParams(dp(26), dp(26)));
+        webStage.addView(opening, new FrameLayout.LayoutParams(-1, -1));
+        mark.setAlpha(0f);
+        mark.setScaleX(.72f);
+        mark.setScaleY(.72f);
+        mark.animate().alpha(1f).scaleX(1f).scaleY(1f).setDuration(420).start();
+        webStage.postDelayed(() -> {
+            if (sequence == openingSequence && opening != null) showOpeningError();
+        }, 25000);
+    }
+
+    private void showOpeningError() {
+        if (opening == null) return;
+        opening.removeAllViews();
+        TextView message = label("تعذّر فتح الصفحة", 20, 0xfff2f8ff, true);
+        opening.addView(message);
+        Button retry = new Button(this);
+        retry.setText("إعادة المحاولة");
+        retry.setOnClickListener(view -> open(settings.getString("url", SITES[0])));
+        opening.addView(retry);
+    }
+
+    private void clearOpening() {
+        openingSequence++;
+        if (opening != null) {
+            webStage.removeView(opening);
+            opening = null;
+        }
     }
     private void openExternally(Uri uri) {
         try { startActivity(new Intent(Intent.ACTION_VIEW, uri)); }
