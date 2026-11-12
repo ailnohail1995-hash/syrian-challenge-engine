@@ -26,12 +26,33 @@ final class ApkFactory {
         File signed = File.createTempFile("signed", ".apk", directory);
         try {
             try (ZipInputStream input = new ZipInputStream(context.getAssets().open("apk-template.bin"));
-                 ZipOutputStream output = new ZipOutputStream(new FileOutputStream(unsigned))) {
+                 FileOutputStream raw = new FileOutputStream(unsigned);
+                 ZipOutputStream output = new ZipOutputStream(raw)) {
                 ZipEntry entry;
                 while ((entry = input.getNextEntry()) != null) {
                     String path = entry.getName();
                     if (entry.isDirectory()) continue;
-                    output.putNextEntry(new ZipEntry(path));
+                    ZipEntry target = new ZipEntry(path);
+                    if ("resources.arsc".equals(path)) {
+                        byte[] resource = read(input);
+                        CRC32 crc = new CRC32();
+                        crc.update(resource);
+                        target.setMethod(ZipEntry.STORED);
+                        target.setSize(resource.length);
+                        target.setCrc(crc.getValue());
+                        int pad = (int) ((4 - ((raw.getChannel().position() + 30 + path.length() + 4) & 3)) & 3);
+                        byte[] extra = new byte[4 + pad];
+                        extra[0] = 0x35;
+                        extra[1] = (byte) 0xd9;
+                        extra[2] = (byte) pad;
+                        target.setExtra(extra);
+                        target.setTime(1230768000000L);
+                        output.putNextEntry(target);
+                        output.write(resource);
+                        output.closeEntry();
+                        continue;
+                    }
+                    output.putNextEntry(target);
                     if ("AndroidManifest.xml".equals(path)) {
                         int version = Math.toIntExact(System.currentTimeMillis() / 1000);
                         File previous = new File(directory, id + ".apk");
