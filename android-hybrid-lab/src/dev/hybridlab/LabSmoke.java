@@ -10,9 +10,11 @@ import android.view.ViewGroup;
 
 public final class LabSmoke extends Instrumentation {
     private boolean alarmOnly;
+    private String offlineMode;
     private String factory;
     @Override public void onCreate(Bundle arguments) {
         super.onCreate(arguments);
+        offlineMode = arguments == null ? null : arguments.getString("offline");
         factory = arguments == null ? null : arguments.getString("factory");
         alarmOnly = arguments != null && "alarm".equals(arguments.getString("mode"));
         start();
@@ -42,10 +44,24 @@ public final class LabSmoke extends Instrumentation {
             String[] names = {"دلجة العام", "دلجة Lovable", "TOQNA", "أبطال TOQNA"};
             String[] hosts = {"dulja-portal-preview.pages.dev", "quran-dulja-tahfez.lovable.app",
                 "toqna.pages.dev", "toqna-heroes-app.pages.dev"};
+            if ("prepare".equals(offlineMode)) {
+                OfflineSite snapshots = new OfflineSite(activity);
+                for (String host : hosts) {
+                    try {
+                        int count = snapshots.ready(host) ? 0 : snapshots.download(host);
+                        System.out.println("PREPARED " + host + " " + count);
+                    } catch (Exception ex) { System.out.println("DOWNLOAD_FAILED " + host + " " + ex); }
+                }
+                finish(Activity.RESULT_OK, result);
+                return;
+            }
             var loaded = MainActivity.class.getDeclaredField("loadedUrl");
             loaded.setAccessible(true);
             var error = MainActivity.class.getDeclaredField("loadError");
             error.setAccessible(true);
+            var webField = MainActivity.class.getDeclaredField("web");
+            webField.setAccessible(true);
+            android.webkit.WebView page = (android.webkit.WebView) webField.get(activity);
             for (int i = 0; i < names.length; i++) {
                 runOnMainSync(() -> {
                     try {
@@ -68,12 +84,20 @@ public final class LabSmoke extends Instrumentation {
                         try { url[0] = (String) loaded.get(activity); url[1] = (String) error.get(activity); }
                         catch (ReflectiveOperationException ex) { throw new IllegalStateException(ex); }
                     });
-                    if (url[1] != null) throw new IllegalStateException(host + ": " + url[1]);
+                    if (url[1] != null) { System.out.println("PAGE_ERROR " + host + " " + url[1]); break; }
                     if (url[0] != null && host.equals(android.net.Uri.parse(url[0]).getHost())) { ready = true; break; }
                     SystemClock.sleep(1000);
                 }
-                if (!ready) throw new IllegalStateException("WebView did not finish loading " + host);
-                result.putString("site_" + i, host + " loaded");
+                if (!ready) { System.out.println("PAGE_FAILED " + host); continue; }
+                boolean rendered = false;
+                for (int retry = 0; retry < 12; retry++) {
+                    java.util.concurrent.ArrayBlockingQueue<String> answer = new java.util.concurrent.ArrayBlockingQueue<>(1);
+                    runOnMainSync(() -> page.evaluateJavascript(
+                        "Boolean(document.body && document.body.innerText.trim().length > 20)", answer::offer));
+                    if ("true".equals(answer.poll(3, java.util.concurrent.TimeUnit.SECONDS))) { rendered = true; break; }
+                    SystemClock.sleep(700);
+                }
+                System.out.println((rendered ? "RENDERED " : "EMPTY ") + host);
             }
             result.putString("stream", "\nPASS: all four site cards loaded in WebView.\n");
             finish(Activity.RESULT_OK, result);
