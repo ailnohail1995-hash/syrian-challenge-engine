@@ -39,6 +39,10 @@ public final class MainActivity extends Activity {
     private FrameLayout webStage;
     private LinearLayout opening;
     private int openingSequence;
+    private OfflineSite offlineSite;
+    private TextView offlineStatus;
+    private final java.util.concurrent.ExecutorService offlineDownloads = java.util.concurrent.Executors.newSingleThreadExecutor();
+    private final java.util.Set<String> downloading = new java.util.HashSet<>();
     private ScrollView home;
     private LinearLayout homeCards;
     private LinearLayout browser;
@@ -53,6 +57,7 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        offlineSite = new OfflineSite(this);
         settings = getSharedPreferences("lab", MODE_PRIVATE);
         FrameLayout root = new FrameLayout(this);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
@@ -90,6 +95,15 @@ public final class MainActivity extends Activity {
         options.setBackground(background(0xff19334a, 12));
         bar.addView(options);
         browser.addView(bar);
+        offlineStatus = label("", 13, 0xffd2f9ed, false);
+        offlineStatus.setGravity(Gravity.CENTER);
+        offlineStatus.setPadding(dp(8), dp(5), dp(8), dp(5));
+        offlineStatus.setVisibility(View.GONE);
+        offlineStatus.setOnClickListener(view -> {
+            String url = web.getUrl();
+            if (url != null) prepareOffline(Uri.parse(url), true);
+        });
+        browser.addView(offlineStatus);
         web = new WebView(this);
         webStage = new FrameLayout(this);
         webStage.setBackgroundColor(0xff081525);
@@ -311,6 +325,11 @@ public final class MainActivity extends Activity {
             return false;
         });
         web.setWebViewClient(new WebViewClient() {
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if (!online() && TRUSTED.contains(origin(uri))) return offlineSite.response(request, uri.getHost());
+                return null;
+            }
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
                 Uri target = request.getUrl();
@@ -336,6 +355,7 @@ public final class MainActivity extends Activity {
                 if (!url.equals(view.getUrl())) return;
                 if (!loadingFailed) {
                     loadedUrl = url;
+                    prepareOffline(Uri.parse(url), false);
                     connectBridge(Uri.parse(url));
                     int sequence = openingSequence;
                     view.postVisualStateCallback(sequence, new WebView.VisualStateCallback() {
@@ -891,11 +911,48 @@ public final class MainActivity extends Activity {
         return "https://" + uri.getHost().toLowerCase(java.util.Locale.ROOT) + (port == -1 || port == 443 ? "" : ":" + port);
     }
 
+    private boolean online() {
+        android.net.ConnectivityManager network = getSystemService(android.net.ConnectivityManager.class);
+        android.net.NetworkCapabilities capabilities = network.getNetworkCapabilities(network.getActiveNetwork());
+        return capabilities != null && capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
+    }
+
+    private void prepareOffline(Uri uri, boolean retry) {
+        if (!TRUSTED.contains(origin(uri))) return;
+        String host = uri.getHost();
+        boolean ready = offlineSite.ready(host);
+        offlineStatus.setVisibility(View.VISIBLE);
+        if (!online()) {
+            offlineStatus.setText(ready ? "النسخة المحفوظة • دون إنترنت" : "اتصل بالإنترنت لتنزيل نسخة الموقع");
+            return;
+        }
+        if (ready && !retry) {
+            offlineStatus.setText("ملفات الواجهة محفوظة • اضغط لتحديثها");
+            return;
+        }
+        offlineStatus.setText("جارٍ حفظ ملفات الموقع…");
+        if (!downloading.add(host)) return;
+        offlineDownloads.execute(() -> {
+            int files = 0;
+            try { files = offlineSite.download(host); }
+            catch (Exception ex) { android.util.Log.w("SalloumOffline", "Download failed for " + host, ex); }
+            final int count = files;
+            runOnUiThread(() -> {
+                downloading.remove(host);
+                if (isDestroyed() || web.getUrl() == null ||
+                        !host.equals(Uri.parse(web.getUrl()).getHost())) return;
+                offlineStatus.setText(count > 0 ? "ملفات الواجهة محفوظة • " + count + " ملف • اضغط لتحديثها"
+                        : "تعذّر إكمال الحفظ • اضغط لإعادة المحاولة");
+            });
+        });
+    }
+
     private void open(String url) {
         if (origin(Uri.parse(url)) == null) return;
         home.setVisibility(View.GONE);
         browser.setVisibility(View.VISIBLE);
         title.setText(settings.getString("name", NAMES[0]));
+        offlineStatus.setVisibility(View.GONE);
         showOpening(url);
         web.loadUrl(url);
     }
@@ -970,5 +1027,5 @@ public final class MainActivity extends Activity {
         else if (web.canGoBack()) web.goBack();
         else if (getResources().getInteger(R.integer.launch_preset) < 0) showHome();
         else super.onBackPressed(); }
-    @Override protected void onDestroy() { closeBridge(); web.destroy(); super.onDestroy(); }
+    @Override protected void onDestroy() { offlineDownloads.shutdownNow(); closeBridge(); web.destroy(); super.onDestroy(); }
 }

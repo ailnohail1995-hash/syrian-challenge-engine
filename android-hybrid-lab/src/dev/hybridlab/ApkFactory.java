@@ -163,7 +163,7 @@ final class ApkFactory {
                 int attributesCount = result.getShort(chunk + 28) & 0xffff;
                 for (int i = 0; i < attributesCount; i++) {
                     int attribute = attributes + i * stride;
-                    if ((result.get(attribute + 15) & 0xff) == 16 && result.getInt(attribute + 16) == 7) {
+                    if ((result.get(attribute + 15) & 0xff) == 16 && result.getInt(attribute + 16) == 8) {
                         result.putInt(attribute + 16, version);
                         return result.array();
                     }

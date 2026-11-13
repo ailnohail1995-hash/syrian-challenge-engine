@@ -61,7 +61,7 @@ fi
 debug=()
 if [[ "${LAB_INSTRUMENTATION:-0}" == 1 ]]; then debug+=(--debug-mode); fi
 "$tools/aapt2" link "${debug[@]}" -A "$out/assets" -I "$android" --manifest "$out/AndroidManifest.xml" --java "$out/generated" \
-  --rename-manifest-package "$package" --version-code 7 --version-name 0.7 -o "$out/unsigned.apk" "$out/resources.zip"
+  --rename-manifest-package "$package" --version-code 8 --version-name 0.8 -o "$out/unsigned.apk" "$out/resources.zip"
 mapfile -t sources < <(find src "$out/generated" -name '*.java' -type f)
 javac --release 17 -classpath "$android:$tools/lib/apksigner.jar" -d "$out/classes" "${sources[@]}"
 jar cf "$out/classes.jar" -C "$out/classes" .
