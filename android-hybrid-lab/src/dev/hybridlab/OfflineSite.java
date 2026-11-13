@@ -95,7 +95,9 @@ final class OfflineSite {
                 Matcher match = paths.matcher(worker);
                 while (match.find()) add(base, match.group(1), pending);
             }
+            Set<String> required = new HashSet<>(pending);
             Set<String> completed = new HashSet<>();
+            int saved = 0;
             long used = 0;
             while (!pending.isEmpty()) {
                 if (completed.size() >= 2500) throw new IOException("Too many files");
@@ -104,7 +106,16 @@ final class OfflineSite {
                 pending.remove(path);
                 if (!completed.add(path)) continue;
                 URL url = new URL(base, path);
-                Asset asset = fetch(url, Math.min(32L * 1024 * 1024, LIMIT - used));
+                Asset asset;
+                try {
+                    asset = fetch(url, Math.min(32L * 1024 * 1024, LIMIT - used));
+                } catch (MissingAsset ex) {
+                    if (required.contains(path)) throw ex;
+                    continue;
+                }
+                if (path.equals("/") && !asset.type.equals("text/html"))
+                    throw new IOException("Invalid homepage for " + host);
+                saved++;
                 used += asset.bytes.length;
                 String id = key(path);
                 try (OutputStream output = new FileOutputStream(new File(staging, id))) { output.write(asset.bytes); }
@@ -116,13 +127,16 @@ final class OfflineSite {
                         output.write(asset.policy.getBytes(StandardCharsets.UTF_8));
                     }
                 }
-                if (asset.type.equals("text/html") || asset.type.contains("javascript")) {
+                if (asset.type.equals("text/html") || asset.type.contains("javascript") || asset.type.equals("text/css")) {
                     String source = new String(asset.bytes, StandardCharsets.UTF_8);
-                    Matcher references = (asset.type.equals("text/html") ? HTML : CHUNK).matcher(source);
+                    Matcher references = (asset.type.equals("text/html") ? HTML : asset.type.equals("text/css")
+                            ? Pattern.compile("url\\(\\s*['\"]?([^'\"\\s)]+)") : CHUNK).matcher(source);
                     while (references.find()) {
                         String value = references.group(1);
                         if (value.matches("(?i).*\\.(?:js|css|png|svg|webp|woff2?|mp3|ogg|wav|json|ico)$"))
-                            add(url, value, pending);
+                            add(value.startsWith("assets/") ? base : url, value, pending);
+                        if (asset.type.equals("text/html") && value.matches("(?i).*\\.(?:m?js|css)$"))
+                            add(url, value, required);
                     }
                     pending.removeAll(completed);
                 }
@@ -134,7 +148,7 @@ final class OfflineSite {
                 throw new IOException("Cannot publish snapshot");
             }
             remove(previous);
-            return completed.size();
+            return saved;
         } finally { remove(staging); }
     }
 
@@ -147,19 +161,35 @@ final class OfflineSite {
     }
 
     private static Asset fetch(URL url, long max) throws IOException {
+        return fetch(url, max, 0);
+    }
+
+    private static Asset fetch(URL url, long max, int redirects) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setInstanceFollowRedirects(false);
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(20000);
         try {
-            if (connection.getResponseCode() != 200) throw new IOException("HTTP " + connection.getResponseCode());
+            int status = connection.getResponseCode();
+            if (status == 301 || status == 302 || status == 303 || status == 307 || status == 308) {
+                String location = connection.getHeaderField("Location");
+                if (location == null || redirects >= 5) throw new IOException("Invalid redirect: " + url.getPath());
+                URL next = new URL(url, location);
+                if (!"https".equals(next.getProtocol()) || !url.getHost().equals(next.getHost()) ||
+                        next.getUserInfo() != null || next.getQuery() != null ||
+                        (next.getPort() != -1 && next.getPort() != 443) || next.getPath().startsWith("/api/"))
+                    throw new IOException("Unexpected redirect: " + url.getPath());
+                return fetch(next, max, redirects + 1);
+            }
+            if (status == 404 || status == 410) throw new MissingAsset("HTTP " + status + ": " + url.getPath());
+            if (status != 200) throw new IOException("HTTP " + status + ": " + url.getPath());
             String header = connection.getContentType();
             String type = header == null ? "application/octet-stream" : header.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
             String path = url.getPath();
-            if ((path.endsWith(".js") && !type.contains("javascript")) ||
+            if (((path.endsWith(".js") || path.endsWith(".mjs")) && !type.contains("javascript")) ||
                     (path.endsWith(".json") && !type.contains("json")) ||
                     (path.endsWith(".css") && !type.equals("text/css")))
-                throw new IOException("Unexpected content type");
+                throw new MissingAsset("Unexpected content type " + type + ": " + path);
             try (InputStream input = connection.getInputStream()) {
                 ByteArrayOutputStream output = new ByteArrayOutputStream();
                 byte[] buffer = new byte[8192];
@@ -177,6 +207,10 @@ final class OfflineSite {
         File[] children = file.listFiles();
         if (children != null) for (File child : children) remove(child);
         file.delete();
+    }
+
+    private static final class MissingAsset extends IOException {
+        MissingAsset(String message) { super(message); }
     }
 
     private static final class Asset {
