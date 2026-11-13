@@ -40,6 +40,7 @@ public final class MainActivity extends Activity {
     private LinearLayout opening;
     private int openingSequence;
     private OfflineSite offlineSite;
+    private android.net.ConnectivityManager.NetworkCallback networkCallback;
     private TextView offlineStatus;
     private final java.util.concurrent.ExecutorService offlineDownloads = java.util.concurrent.Executors.newSingleThreadExecutor();
     private final java.util.Set<String> downloading = new java.util.HashSet<>();
@@ -58,6 +59,16 @@ public final class MainActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         offlineSite = new OfflineSite(this);
+        OfflineSite snapshots = offlineSite;
+        android.net.ConnectivityManager network = getSystemService(android.net.ConnectivityManager.class);
+        ServiceWorkerController.getInstance().setServiceWorkerClient(new ServiceWorkerClient() {
+            @Override public WebResourceResponse shouldInterceptRequest(WebResourceRequest request) {
+                Uri uri = request.getUrl();
+                if (!hasInternet(network) && TRUSTED.contains(origin(uri)))
+                    return snapshots.response(request, uri.getHost());
+                return null;
+            }
+        });
         settings = getSharedPreferences("lab", MODE_PRIVATE);
         FrameLayout root = new FrameLayout(this);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
@@ -112,8 +123,28 @@ public final class MainActivity extends Activity {
         browser.addView(webStage, new LinearLayout.LayoutParams(-1, 0, 1));
         setContentView(root);
         configureWebView();
+        networkCallback = new android.net.ConnectivityManager.NetworkCallback() {
+            @Override public void onAvailable(android.net.Network available) {
+                runOnUiThread(() -> {
+                    if (isDestroyed()) return;
+                    if (getResources().getInteger(R.integer.launch_preset) < 0 && getPackageName().equals("dev.hybridlab")) {
+                        for (String site : SITES) {
+                            String host = Uri.parse(site).getHost();
+                            if (!offlineSite.ready(host)) queueOffline(host, false);
+                        }
+                    }
+                    if (web.getUrl() != null) prepareOffline(Uri.parse(web.getUrl()), false);
+                });
+            }
+        };
+        network.registerDefaultNetworkCallback(networkCallback);
         int preset = getResources().getInteger(R.integer.launch_preset);
-        if (preset < 0) showHome();
+        if (preset < 0) {
+            showHome();
+            if (online()) {
+                for (String site : SITES) queueOffline(Uri.parse(site).getHost(), false);
+            }
+        }
         else {
             back.setVisibility(View.GONE);
             String url = SITES[preset];
@@ -913,6 +944,10 @@ public final class MainActivity extends Activity {
 
     private boolean online() {
         android.net.ConnectivityManager network = getSystemService(android.net.ConnectivityManager.class);
+        return hasInternet(network);
+    }
+
+    private static boolean hasInternet(android.net.ConnectivityManager network) {
         android.net.NetworkCapabilities capabilities = network.getNetworkCapabilities(network.getActiveNetwork());
         return capabilities != null && capabilities.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
     }
@@ -931,16 +966,25 @@ public final class MainActivity extends Activity {
             return;
         }
         offlineStatus.setText("جارٍ حفظ ملفات الموقع…");
+        queueOffline(host, retry);
+    }
+
+    private void queueOffline(String host, boolean retry) {
         if (!downloading.add(host)) return;
         offlineDownloads.execute(() -> {
             int files = 0;
-            try { files = offlineSite.download(host); }
+            try { if (retry || !offlineSite.ready(host)) files = offlineSite.download(host); }
             catch (Exception ex) { android.util.Log.w("SalloumOffline", "Download failed for " + host, ex); }
             final int count = files;
             runOnUiThread(() -> {
                 downloading.remove(host);
                 if (isDestroyed() || web.getUrl() == null ||
                         !host.equals(Uri.parse(web.getUrl()).getHost())) return;
+                if (count == 0 && offlineSite.ready(host)) {
+                    offlineStatus.setText("ملفات الواجهة محفوظة • اضغط لتحديثها");
+                    return;
+                }
+                offlineStatus.setVisibility(View.VISIBLE);
                 offlineStatus.setText(count > 0 ? "ملفات الواجهة محفوظة • " + count + " ملف • اضغط لتحديثها"
                         : "تعذّر إكمال الحفظ • اضغط لإعادة المحاولة");
             });
@@ -1027,5 +1071,5 @@ public final class MainActivity extends Activity {
         else if (web.canGoBack()) web.goBack();
         else if (getResources().getInteger(R.integer.launch_preset) < 0) showHome();
         else super.onBackPressed(); }
-    @Override protected void onDestroy() { offlineDownloads.shutdownNow(); closeBridge(); web.destroy(); super.onDestroy(); }
+    @Override protected void onDestroy() { getSystemService(android.net.ConnectivityManager.class).unregisterNetworkCallback(networkCallback); offlineDownloads.shutdownNow(); closeBridge(); web.destroy(); super.onDestroy(); }
 }
